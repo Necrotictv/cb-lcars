@@ -2,161 +2,62 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>LaForge — Glance Grid Main (renderer build)</title>
+<title>LaForge — U.S.S. Jarvis Terminal</title>
 <link href="https://fonts.googleapis.com/css2?family=Antonio:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  /* Screen chrome comes from lcars.js — this CSS only styles CONTENT INSIDE
-     panels (the canon "type spacing" exception: text follows type, not grid).
-     Press G to toggle the debug grid overlay. */
+  /* Chrome/geometry comes from lcars.js + app.js. This CSS styles only content
+     INSIDE panels (canon "type spacing" exception). Press G for grid overlay. */
   html,body{margin:0;height:100%;background:#000;overflow:hidden}
   #screen{width:100vw;height:100vh}
+
+  /* cluster body text */
   .clb{padding:calc(var(--u)*0.4);font-size:calc(var(--u)*0.40);line-height:1.9;
     color:#d8c7ec;letter-spacing:.08em;text-transform:uppercase;height:100%;box-sizing:border-box}
   .clb .v{color:#ff9c00} .clb .w{color:#cc6666}
+  .standby{font-size:calc(var(--u)*0.55);color:#f2935b;letter-spacing:.2em}
+
+  /* mini level bars */
   .mb{display:flex;align-items:center;gap:calc(var(--u)*0.3);margin:calc(var(--u)*0.12) 0}
   .mb .k{width:calc(var(--u)*3.2);color:#cc99cc}
-  .mb .t{flex:1;height:calc(var(--u)*0.5);background:#12141c;border-radius:2px;position:relative}
+  .mb .t{flex:1;height:calc(var(--u)*0.5);background:#12141c;border-radius:2px;position:relative;overflow:hidden}
   .mb .t i{position:absolute;left:0;top:0;bottom:0;border-radius:2px;background:#f3f08b}
   .mb .n{width:calc(var(--u)*1.8);text-align:right;color:#ff9c00}
+
+  /* camera thumbs + the scan sweep (each cam animates on its own tempo) */
   .cams{display:flex;gap:calc(var(--u)*0.3);height:62%;margin-bottom:calc(var(--u)*0.25)}
-  .cam{flex:1;background:#0a0c12;border:1px solid #39415e;border-radius:4px;position:relative}
+  .cam{flex:1;background:#0a0c12;border:1px solid #39415e;border-radius:4px;position:relative;overflow:hidden}
   .cam::after{content:attr(data-n);position:absolute;bottom:4px;left:6px;
     font-size:calc(var(--u)*0.35);color:#9999cc;letter-spacing:.15em}
+  .cam .scan{position:absolute;left:0;right:0;height:2px;background:#66ccd9;opacity:.5;
+    animation:scan linear infinite}
+  .cam:nth-child(1) .scan{animation-duration:4.2s}
+  .cam:nth-child(2) .scan{animation-duration:5.7s;animation-delay:1.3s}
+  .cam:nth-child(3) .scan{animation-duration:3.4s;animation-delay:2.1s}
+  @keyframes scan{0%{top:-2px}100%{top:100%}}
+
+  /* vertical transporter dimmers (LIGHTS workspace) */
+  .slrow{display:flex;height:100%;gap:calc(var(--u)*0.8);padding:calc(var(--u)*0.6);
+    box-sizing:border-box;justify-content:center}
+  .vsl{display:flex;flex-direction:column;align-items:center;gap:calc(var(--u)*0.25);
+    flex:0 1 calc(var(--u)*3);min-width:0}
+  .vtrack{flex:1;width:70%;border:1px solid #444a63;border-radius:4px;position:relative;
+    background:repeating-linear-gradient(to top,transparent 0,transparent 7px,#12141c 7px,#12141c 8px);
+    touch-action:none;cursor:pointer}
+  .vfill{position:absolute;left:3px;right:3px;bottom:3px;background:#f3f08b;opacity:.55;border-radius:2px}
+  .vhandle{position:absolute;left:-3px;right:-3px;height:6px;background:#f2935b;border-radius:2px}
+  .vval{font-size:calc(var(--u)*0.7);color:#ff9c00;font-family:Antonio}
+  .vlab{font-size:calc(var(--u)*0.4);color:#cc99cc;letter-spacing:.1em}
+
+  /* workspace switch buttons */
+  .btncol{display:flex;flex-direction:column;gap:calc(var(--u)*0.5);padding:calc(var(--u)*0.6)}
+  .wbtn{height:calc(var(--u)*1.8);border-radius:calc(var(--u)*0.9);color:#000;
+    font-size:calc(var(--u)*0.55);font-weight:600;display:flex;align-items:center;
+    justify-content:center;letter-spacing:.08em;font-family:Antonio}
 </style>
 </head>
 <body>
 <div id="screen"></div>
 <script src="lcars.js"></script>
-<script>
-'use strict';
-/* =============================================================================
-   GLANCE GRID MAIN — the locked main-screen methodology (LAFORGE_DESIGN.md).
-   Every piece of chrome is placed by the renderer in u-coordinates, so every
-   junction derives from ONE set of frame constants below. Change RAIL and the
-   elbow, rail blocks, and content edge all move together — that is the "fit".
-   ============================================================================= */
-
-const root = document.getElementById('screen');
-const { GAP, SEAM } = LCARS;
-/* WHY u = width/50: the screen is ALWAYS exactly 50 units wide (ha-lcars-panel
-   convention: lcars_unit = 2vw). Proportions are identical on any display —
-   the design is resolution-independent by definition, not by luck. */
-const UNITS_WIDE = 50;
-
-/* ---- frame constants (all 0.25u multiples) ---- */
-const RAIL = 6;      // vertical arm / rail width  — "thick"
-const BARH = 1.0;    // horizontal arm / bar height — "thin" (thick→thin canon)
-const RO = 2, RI = 1;        // outer/inner elbow radii (LOCKED)
-const EW = 7.5, EH = 3.5;    // elbow piece bounding box
-
-function build() {
-  root.innerHTML = '';                       // idempotent rebuild (resize-safe)
-  const u = root.clientWidth / UNITS_WIDE;
-  document.documentElement.style.setProperty('--u', u + 'px');
-  const scr2 = LCARS.screen(root, { u });
-  const W = UNITS_WIDE;                      // exactly 50u wide, always
-  const H = Math.floor(scr2.uh * 4) / 4;     // height snapped to the grid
-
-  /* ================= FRAME (one param set → all junctions) ================= */
-  /* Top-left elbow: its vertical arm IS the rail, horizontal arm IS the top bar */
-  scr2.elbow(0, 0, { corner:'tl', tv:RAIL, th:BARH, ro:RO, ri:RI, w:EW, h:EH, color:'lilac' });
-
-  /* top bar continues the elbow's horizontal arm at the SAME y/height */
-  const capW = 1.5, txtW = 16;
-  scr2.bar(EW, 0, 2, BARH, 'gold',   { left:true });
-  scr2.bar(EW + 2, 0, W - EW - 2 - txtW - capW, BARH, 'lilac', { left:true });
-  scr2.text(W - txtW - capW, 0, txtW - 0.5, BARH,
-    'U.S.S. JARVIS · ALL SYSTEMS DISPLAY <b style="color:#fff">· ONLINE</b>',
-    { fs:'sub', color:'orange', align:'right', weight:600 });
-  scr2.shape(W - capW, 0, capW, BARH, { capRight:true, color:'peri' });
-
-  /* rail continues the elbow's vertical arm at the SAME x/width */
-  const railBlocks = [                        // [height, color, label]
-    [2.5, 'lilac', 'LCARS 47-2210'],
-    [2.5, 'peri',  'SYSTEMS'],
-    [2.5, 'gold',  'MODE SELECT'],
-  ];
-  let ry = EH;
-  for (const [bh, color, label] of railBlocks) {
-    scr2.bar(0, ry, RAIL, bh, color, { top:true });
-    scr2.text(0, ry + bh - 0.75, RAIL - 0.25, 0.75, label,
-      { fs:'data', color:'black', align:'right', weight:600 });
-    ry += bh;
-  }
-  /* peach filler absorbs leftover height so the rail always meets the bottom elbow */
-  scr2.bar(0, ry, RAIL, (H - EH) - ry, 'peach', { top:true, bottom:true });
-  scr2.text(0, H - EH - 1, RAIL - 0.25, 0.75, '490-0504',
-    { fs:'data', color:'black', align:'right', weight:600 });
-
-  /* bottom-left elbow closes the frame into the console bar */
-  scr2.elbow(0, H - EH, { corner:'bl', tv:RAIL, th:BARH, ro:RO, ri:RI, w:EW, h:EH, color:'peach' });
-  scr2.text(EW + 0.25, H - BARH, 8, BARH, 'CONSOLE · OVERVIEW',
-    { fs:'sub', color:'orange', weight:600 });
-  scr2.bar(EW + 8.5, H - BARH, W - EW - 8.5 - capW, BARH, 'lilac', { left:true });
-  scr2.shape(W - capW, H - BARH, capW, BARH, { capRight:true, color:'peri' });
-
-  /* ================= CONTENT REGION (derived from frame) ================= */
-  const cx0 = RAIL + GAP, cx1 = W - GAP;
-  const cy0 = BARH + GAP, cy1 = H - BARH - GAP;
-
-  /* identity stack, top-right */
-  scr2.text(cx1 - 20, cy0,        20, 0.5,  'RESIDENCE', { fs:'data', color:'orange', align:'right', ls:'.2em' });
-  scr2.text(cx1 - 20, cy0 + 0.5,  20, 2.5,  'OVERVIEW',  { fs:'title', color:'orange', align:'right', weight:700 });
-  const clk =
-  scr2.text(cx1 - 20, cy0 + 3,    20, 0.5,  '', { fs:'data', color:'gold', align:'right' });
-
-  /* flavor-number columns, top-left (intro2 authenticity — decorative data) */
-  scr2.place(cx0, cy0, 16, 2,
-    `font-size:${scr2.U(0.4)}px;color:#ff9c00;letter-spacing:.14em;line-height:1.6;opacity:.85;`)
-    .innerHTML = '48934312431&nbsp;&nbsp;478&nbsp;&nbsp;090343&nbsp;&nbsp;2385729385<br>' +
-                 '54682435221&nbsp;&nbsp;442&nbsp;&nbsp;564&nbsp;&nbsp;342778&nbsp;&nbsp;334';
-
-  /* ================= GLANCE GRID: 3×2 clusters ================= */
-  const gy0 = cy0 + 4;                       // below identity, on the grid
-  const cols = 3, rows = 2;
-  const cw = Math.floor(((cx1 - cx0) - (cols - 1) * GAP) / cols * 4) / 4;
-  const ch = Math.floor(((cy1 - gy0) - (rows - 1) * GAP) / rows * 4) / 4;
-  const HDR = 1.25;                          // cluster header bar (tap target)
-
-  function cluster(ci, ri2, color, title, badge, bodyHTML) {
-    const x = cx0 + ci * (cw + GAP), y = gy0 + ri2 * (ch + GAP);
-    scr2.shape(x, y, cw, HDR, { capRight:true, color });          // header = the button (canon §6)
-    scr2.text(x + 0.5, y, cw - 2, HDR, title, { fs:'sub', color:'black', weight:600 });
-    scr2.text(x, y, cw - 1, HDR, badge, { fs:'data', color:'black', align:'right', weight:600 });
-    const body = scr2.panel(x, y + HDR + 0.25, cw, ch - HDR - 0.25);
-    body.innerHTML = `<div class="clb">${bodyHTML}</div>`;
-  }
-
-  cluster(0, 0, 'canary', 'LIGHTS', '3/5 ON', `
-    <div class="mb"><div class="k">LIVING</div><div class="t"><i style="width:72%"></i></div><div class="n">72</div></div>
-    <div class="mb"><div class="k">FOYER</div><div class="t"><i style="width:45%"></i></div><div class="n">45</div></div>
-    <div class="mb"><div class="k">KITCHEN</div><div class="t"><i style="width:90%"></i></div><div class="n">90</div></div>
-    <div class="mb"><div class="k">BACKYD</div><div class="t"></div><div class="n">OFF</div></div>`);
-  cluster(1, 0, 'salmon', 'SECURITY', 'GREEN', `
-    <div class="cams"><div class="cam" data-n="FRONT DOOR"></div><div class="cam" data-n="BACKYARD"></div><div class="cam" data-n="DOWNSTAIRS"></div></div>
-    MOTION <span class="v">ARMED</span> · SIRENS <span class="v">STANDBY</span>`);
-  cluster(2, 0, 'lilac', 'CLIMATE', '71°F', `
-    CONDITION <span class="v">CLEAR</span><br>HUMIDITY <span class="v">44%</span><br>
-    SUNSET <span class="v">20:31</span> · UV <span class="v">3</span>`);
-  cluster(0, 1, 'magenta', 'MEDIA', 'IDLE', `
-    DOWNSTAIRS <span class="v">VOL 6</span><br>EVERYWHERE <span class="v">STANDBY</span><br>
-    ANNOUNCE <span class="v">READY</span>`);
-  cluster(1, 1, 'peri', 'HOME', '2 EVENTS', `
-    14:00 <span class="v">STANDUP</span><br>18:30 <span class="v">FILM SESSION</span><br>
-    LITTER ROBOT <span class="v">CYCLED 12:40</span>`);
-  cluster(2, 1, 'peach', 'CORE', 'NOMINAL', `
-    <div class="mb"><div class="k">CPU</div><div class="t"><i style="width:34%;background:#ff9966"></i></div><div class="n">34</div></div>
-    <div class="mb"><div class="k">MEM</div><div class="t"><i style="width:61%;background:#ff9966"></i></div><div class="n">61</div></div>
-    WAN <span class="v">ONLINE</span> · ALARMS <span class="w">1</span>`);
-
-  /* live stardate/clock */
-  const tick = () => { const d = new Date(), p = n => String(n).padStart(2,'0');
-    clk.innerHTML = 'STARDATE ' + p(d.getMonth()+1) + p(d.getDate()) + d.getFullYear() + ':' + p(d.getHours()) + p(d.getMinutes()); };
-  tick(); setInterval(tick, 1000);
-}
-
-build();
-addEventListener('resize', () => build());   // re-snap to the new viewport
-</script>
+<script src="app.js"></script>
 </body>
 </html>

@@ -181,6 +181,53 @@ const LCARS = (() => {
     scr.panel = (x, y, w, h) =>
       scr.place(x, y, w, h, `background:${COLORS.ebony};overflow:hidden;`);
 
+    /* ---- onTap(): touch-first press feedback ----
+       Brightness flash on pointerdown (the LCARS "acknowledge"), handler on
+       release. WHY pointer events: works for touch AND mouse, no 300ms delay. */
+    scr.onTap = (el, fn) => {
+      el.style.cursor = 'pointer';
+      el.addEventListener('pointerdown', () => {
+        el.style.transition = 'filter 60ms';
+        el.style.filter = 'brightness(1.7)';
+      });
+      const release = () => { el.style.transition = 'filter 180ms'; el.style.filter = ''; };
+      el.addEventListener('pointerup', e => { release(); fn?.(e); });
+      el.addEventListener('pointercancel', release);
+      el.addEventListener('pointerleave', release);
+      return el;
+    };
+
+    /* ---- breathe(): §8 breathing pulse ----
+       Each element gets its OWN randomized duration + delay so pulses never
+       sync up (the "no obvious loops" rule). soft=true keeps labels legible. */
+    scr.breathe = (el, { soft = false } = {}) => {
+      const dur = 3000 + Math.random() * 1500;          // 3–4.5s, unique per element
+      el.animate(
+        [{ opacity: 1 }, { opacity: soft ? 0.5 : 0.18 }, { opacity: 1 }],
+        { duration: dur, delay: Math.random() * dur, iterations: Infinity, easing: 'ease-in-out' });
+      return el;
+    };
+
+    /* ---- digits(): live flavor-number stream ----
+       Code-driven randomness (§8): each line mutates on its own randomized
+       interval — the classic "computer is thinking" okudagram texture. */
+    scr.digits = (el, lines = 2, groups = 5) => {
+      const rnd = n => String(Math.floor(Math.random() * 10 ** n)).padStart(n, '0');
+      const line = () => Array.from({ length: groups },
+        () => rnd([3,5,6,8,11][Math.floor(Math.random() * 5)])).join('&nbsp;&nbsp;');
+      const rows = Array.from({ length: lines }, () => line());
+      const paint = () => { el.innerHTML = rows.join('<br>'); };
+      paint();
+      rows.forEach((_, i) => {
+        const tickRow = () => {
+          rows[i] = line(); paint();
+          setTimeout(tickRow, 900 + Math.random() * 2200);   // own tempo per row
+        };
+        setTimeout(tickRow, Math.random() * 2000);
+      });
+      return el;
+    };
+
     /* ---- debug grid overlay: SEE the invisible grid (toggle: press G) ----
        WHY: "elements must fit the grid" is only checkable if the grid is
        visible. Minor lines every 0.25u, major lines every 1u. */
