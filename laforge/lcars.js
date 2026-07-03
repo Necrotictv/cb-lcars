@@ -20,11 +20,36 @@
 const LCARS = (() => {
   'use strict';
 
-  /* ---- palette: UI_STANDARDS §3, TNG okudagram dialect ---- */
+  /* ---- palettes: UI_STANDARDS §3. Same named ROLES, three era skins ----
+     WHY roles not hexes everywhere: swapping palette = reassigning the role
+     table; every element already drawn by role follows automatically. */
+  const PALETTES = {
+    tng: { peach:'#ff9966', lilac:'#cc99cc', peri:'#9999cc', gold:'#ffcc66',
+           salmon:'#cc6666', canary:'#f3f08b', magenta:'#cc6699', orange:'#ff9c00' },
+    ds9: { peach:'#ffaa55', lilac:'#bb8877', peri:'#8899bb', gold:'#ffbb33',
+           salmon:'#bb5544', canary:'#ddcc77', magenta:'#aa6688', orange:'#ff9900' },
+    voy: { peach:'#ffb380', lilac:'#b0a0dd', peri:'#7f96d4', gold:'#e6c97a',
+           salmon:'#c76b6b', canary:'#e8e08a', magenta:'#b05fa0', orange:'#ffaa33' },
+  };
   const COLORS = {
-    peach:'#ff9966', lilac:'#cc99cc', peri:'#9999cc', gold:'#ffcc66',
-    salmon:'#cc6666', canary:'#f3f08b', magenta:'#cc6699', orange:'#ff9c00',
+    ...PALETTES.tng,
     ebony:'#20232c', text:'#d8c7ec', black:'#000000',
+  };
+  function setPalette(name) {
+    Object.assign(COLORS, PALETTES[name] ?? PALETTES.tng);
+    /* mirror to CSS vars so panel-content styles follow the palette too */
+    for (const [k, v] of Object.entries(COLORS))
+      document.documentElement.style.setProperty('--c-' + k, v);
+  }
+
+  /* ---- persistent settings (v0.3): localStorage now, HA helpers in Phase 2
+     so every terminal shares config. Survives restarts by requirement. ---- */
+  const settings = {
+    _KEY: 'laforge-settings',
+    _data: null,
+    _load() { if (!this._data) { try { this._data = JSON.parse(localStorage.getItem(this._KEY)) ?? {}; } catch { this._data = {}; } } return this._data; },
+    get(k, dflt) { const d = this._load(); return k in d ? d[k] : dflt; },
+    set(k, v) { const d = this._load(); d[k] = v; localStorage.setItem(this._KEY, JSON.stringify(d)); },
   };
 
   /* ---- global spacing constants (UI_STANDARDS §4) — the ONLY two gaps ---- */
@@ -247,5 +272,8 @@ const LCARS = (() => {
     return scr;
   }
 
-  return { screen, COLORS, SEAM, GAP };
+  /* boot with the persisted palette (default TNG) */
+  setPalette(settings.get('palette', 'tng'));
+
+  return { screen, COLORS, PALETTES, setPalette, settings, SEAM, GAP };
 })();

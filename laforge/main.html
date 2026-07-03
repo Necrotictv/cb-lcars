@@ -13,15 +13,15 @@
   /* cluster body text */
   .clb{padding:calc(var(--u)*0.4);font-size:calc(var(--u)*0.40);line-height:1.9;
     color:#d8c7ec;letter-spacing:.08em;text-transform:uppercase;height:100%;box-sizing:border-box}
-  .clb .v{color:#ff9c00} .clb .w{color:#cc6666}
-  .standby{font-size:calc(var(--u)*0.55);color:#f2935b;letter-spacing:.2em}
+  .clb .v{color:var(--c-orange,#ff9c00)} .clb .w{color:var(--c-salmon,#cc6666)}
+  .standby{font-size:calc(var(--u)*0.55);color:var(--c-peach,#ff9966);letter-spacing:.2em}
 
   /* mini level bars */
   .mb{display:flex;align-items:center;gap:calc(var(--u)*0.3);margin:calc(var(--u)*0.12) 0}
-  .mb .k{width:calc(var(--u)*3.2);color:#cc99cc}
+  .mb .k{width:calc(var(--u)*3.2);color:var(--c-lilac,#cc99cc)}
   .mb .t{flex:1;height:calc(var(--u)*0.5);background:#12141c;border-radius:2px;position:relative;overflow:hidden}
-  .mb .t i{position:absolute;left:0;top:0;bottom:0;border-radius:2px;background:#f3f08b}
-  .mb .n{width:calc(var(--u)*1.8);text-align:right;color:#ff9c00}
+  .mb .t i{position:absolute;left:0;top:0;bottom:0;border-radius:2px;background:var(--c-canary,#f3f08b)}
+  .mb .n{width:calc(var(--u)*1.8);text-align:right;color:var(--c-orange,#ff9c00)}
 
   /* camera thumbs + the scan sweep (each cam animates on its own tempo) */
   .cams{display:flex;gap:calc(var(--u)*0.3);height:62%;margin-bottom:calc(var(--u)*0.25)}
@@ -43,10 +43,10 @@
   .vtrack{flex:1;width:70%;border:1px solid #444a63;border-radius:4px;position:relative;
     background:repeating-linear-gradient(to top,transparent 0,transparent 7px,#12141c 7px,#12141c 8px);
     touch-action:none;cursor:pointer}
-  .vfill{position:absolute;left:3px;right:3px;bottom:3px;background:#f3f08b;opacity:.55;border-radius:2px}
-  .vhandle{position:absolute;left:-3px;right:-3px;height:6px;background:#f2935b;border-radius:2px}
-  .vval{font-size:calc(var(--u)*0.7);color:#ff9c00;font-family:Antonio}
-  .vlab{font-size:calc(var(--u)*0.4);color:#cc99cc;letter-spacing:.1em}
+  .vfill{position:absolute;left:3px;right:3px;bottom:3px;background:var(--c-canary,#f3f08b);opacity:.55;border-radius:2px}
+  .vhandle{position:absolute;left:-3px;right:-3px;height:6px;background:var(--c-peach,#ff9966);border-radius:2px}
+  .vval{font-size:calc(var(--u)*0.7);color:var(--c-orange,#ff9c00);font-family:Antonio}
+  .vlab{font-size:calc(var(--u)*0.4);color:var(--c-lilac,#cc99cc);letter-spacing:.1em}
 
   /* workspace switch buttons */
   .btncol{display:flex;flex-direction:column;gap:calc(var(--u)*0.5);padding:calc(var(--u)*0.6)}

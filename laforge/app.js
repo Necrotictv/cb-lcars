@@ -21,13 +21,15 @@ const RAIL = 6, BARH = 1.0, RO = 2, RI = 1, EW = 7.5, EH = 3.5;
 const DTH = 0.5, DEH = 2.75;   // subscreen divider arm thickness / elbow box height
 
 /* ---- the six function groups (LAFORGE_DESIGN.md nav map) ---- */
+/* local = screen-specific nav (hub-and-spoke model: subscreens navigate only
+   back to MAIN; the top row belongs to THIS screen's own views instead) */
 const GROUPS = [
-  { id:'lights',   label:'LIGHTS',   color:'canary',  badge:'3/5 ON' },
-  { id:'security', label:'SECURITY', color:'salmon',  badge:'GREEN' },
-  { id:'climate',  label:'CLIMATE',  color:'lilac',   badge:'71°F' },
-  { id:'media',    label:'MEDIA',    color:'magenta', badge:'IDLE' },
-  { id:'home',     label:'HOME',     color:'peri',    badge:'2 EVENTS' },
-  { id:'core',     label:'CORE',     color:'peach',   badge:'NOMINAL' },
+  { id:'lights',   label:'LIGHTS',   color:'canary',  badge:'3/5 ON',   local:['ALL','INTERIOR','EXTERIOR','SCENES'] },
+  { id:'security', label:'SECURITY', color:'salmon',  badge:'GREEN',    local:['CAMERAS','PERIMETER','ALERTS'] },
+  { id:'climate',  label:'CLIMATE',  color:'lilac',   badge:'71°F',     local:['CURRENT','FORECAST','SURVEY'] },
+  { id:'media',    label:'MEDIA',    color:'magenta', badge:'IDLE',     local:['PLAYERS','ANNOUNCE','VOLUME'] },
+  { id:'home',     label:'HOME',     color:'peri',    badge:'2 EVENTS', local:['MSD','CALENDAR','ROUTINES'] },
+  { id:'core',     label:'CORE',     color:'peach',   badge:'NOMINAL',  local:['FRED','NETWORK','UPDATES'] },
 ];
 
 /* ---- mock live data (Phase 2: replaced by HA websocket state) ---- */
@@ -60,6 +62,7 @@ function render() {
   const scr = LCARS.screen(root, { u });
   const W = UNITS_WIDE, H = Math.floor(scr.uh * 4) / 4;
   if (current === 'main') renderMain(scr, W, H);
+  else if (current === 'systems') renderSystems(scr, W, H);
   else renderGroup(scr, W, H, GROUPS.find(g => g.id === current));
   /* live stardate/clock — every screen has one */
   const tick = () => { const d = new Date(), p = n => String(n).padStart(2,'0');
@@ -85,18 +88,34 @@ function chrome(scr, W, H, consoleLabel, elbowTop, elbowBottom) {
   scr.shape(W - capW, H - BARH, capW, BARH, { capRight:true, color:'peri' });
 }
 
+/* ---- rail control blocks (v0.3): SYSTEMS = UI config, MODE = mic mute ----
+   MODE spec (Patrick): mute is IGNORE-not-off — while muted the block wears the
+   palette's IDLE color (lilac) and breathes: "present but not listening". */
+function railSystems(scr, y, bh) {
+  const b = scr.bar(0, y, RAIL, bh, 'peri', { top:true });
+  scr.onTap(b, () => navigate('systems'));
+  scr.text(0, y + bh - 0.75, RAIL - 0.25, 0.75, 'SYSTEMS',
+    { fs:'data', color:'black', align:'right', weight:600 }).style.pointerEvents = 'none';
+}
+function railMode(scr, y, bh) {
+  const muted = LCARS.settings.get('micMute', false);
+  const b = scr.bar(0, y, RAIL, bh, muted ? 'lilac' : 'gold', { top:true });
+  scr.onTap(b, () => { LCARS.settings.set('micMute', !muted); render(); });
+  if (muted) scr.breathe(b);
+  scr.text(0, y + bh - 0.75, RAIL - 0.25, 0.75, muted ? 'MIC MUTED' : 'MODE SELECT',
+    { fs:'data', color:'black', align:'right', weight:600 }).style.pointerEvents = 'none';
+}
+
 /* ============================ MAIN SCREEN ============================ */
 function renderMain(scr, W, H) {
   chrome(scr, W, H, 'CONSOLE · OVERVIEW', 'lilac', 'peach');
 
-  /* rail blocks between the elbows */
-  const railBlocks = [ [2.5,'lilac','LCARS 47-2210'], [2.5,'peri','SYSTEMS'], [2.5,'gold','MODE SELECT'] ];
-  let ry = EH;
-  for (const [bh, color, label] of railBlocks) {
-    scr.bar(0, ry, RAIL, bh, color, { top:true });
-    scr.text(0, ry + bh - 0.75, RAIL - 0.25, 0.75, label, { fs:'data', color:'black', align:'right', weight:600 });
-    ry += bh;
-  }
+  /* rail blocks between the elbows — SYSTEMS + MODE are live controls */
+  scr.bar(0, EH, RAIL, 2.5, 'lilac', { top:true });
+  scr.text(0, EH + 1.75, RAIL - 0.25, 0.75, 'LCARS 47-2210', { fs:'data', color:'black', align:'right', weight:600 });
+  railSystems(scr, EH + 2.5, 2.5);
+  railMode(scr, EH + 5, 2.5);
+  const ry = EH + 7.5;
   scr.bar(0, ry, RAIL, (H - EH) - ry, 'peach', { top:true, bottom:true });
   scr.text(0, H - EH - 1, RAIL - 0.25, 0.75, '490-0504', { fs:'data', color:'black', align:'right', weight:600 });
 
@@ -169,13 +188,10 @@ function renderGroup(scr, W, H, g) {
   /* lower frame: TL elbow whose arm is the divider's BOTTOM half */
   const dy2 = dy + DEH + 0.25;
   scr.elbow(0, dy2, { corner:'tl', tv:RAIL, th:DTH, ro:RO, ri:RI, w:EW, h:DEH, color:'peach' });
-  /* rail blocks joining lower elbow down to the bottom elbow */
-  let ry = dy2 + DEH;
-  for (const [bh, color, label] of [ [2.5,'peri','SYSTEMS'], [2.5,'gold','MODE SELECT'] ]) {
-    scr.bar(0, ry, RAIL, bh, color, { top:true });
-    scr.text(0, ry + bh - 0.75, RAIL - 0.25, 0.75, label, { fs:'data', color:'black', align:'right', weight:600 });
-    ry += bh;
-  }
+  /* rail blocks joining lower elbow down to the bottom elbow — live controls */
+  railSystems(scr, dy2 + DEH, 2.5);
+  railMode(scr, dy2 + DEH + 2.5, 2.5);
+  const ry = dy2 + DEH + 5;
   scr.bar(0, ry, RAIL, (H - EH) - ry, 'peach', { top:true, bottom:true });
 
   /* segmented divider tube (both halves share widths/colors — V4 technique),
@@ -195,14 +211,17 @@ function renderGroup(scr, W, H, g) {
 
   /* ---- upper content: HOME + group row (1 tap to anywhere) + identity ---- */
   const cx0 = RAIL + GAP, cx1 = W - GAP;
-  /* MAIN = back to overview. Structural white, NOT a category color — it's
-     terminal chrome, not a function group (avoids the double-HOME confusion). */
+  /* HUB-AND-SPOKE (v0.3): the ONLY global nav on a subscreen is MAIN.
+     Structural white — terminal chrome, not a category color. The rest of the
+     row belongs to THIS screen's local views (canon §3: inactive = idle lilac). */
   const home = scr.button(cx0, BARH + 0.5, 4, 'MAIN', { color:'#d8c7ec', on:true, ends:'pill' });
   scr.onTap(home, () => navigate('main'));
-  GROUPS.forEach((k, i) => {
-    const b = scr.button(cx0 + 4.5 + i * 6, BARH + 0.5, 5.5, k.label,
-      { color:k.color, on:k.id === g.id, ends:'pill' });
-    if (k.id !== g.id) { scr.breathe(b, { soft:true }); scr.onTap(b, () => navigate(k.id)); }
+  (g.local ?? []).forEach((label, i) => {
+    const active = i === 0;                       // first local view active (mock until workspaces get views)
+    const b = scr.button(cx0 + 4.5 + i * 6, BARH + 0.5, 5.5, label,
+      { color: active ? g.color : 'lilac', on: active, ends:'pill' });
+    if (!active) scr.breathe(b, { soft:true });
+    scr.onTap(b, () => {});                       // local view switching lands with each workspace build
   });
   scr.digits(scr.place(cx0, BARH + 2.75, 18, 1.5,
     `font-size:${scr.U(0.4)}px;color:#ff9c00;letter-spacing:.14em;line-height:1.6;opacity:.85;`), 2, 4);
@@ -214,6 +233,68 @@ function renderGroup(scr, W, H, g) {
   const wy0 = dy2 + DTH + GAP, wy1 = H - BARH - GAP;
   if (g.id === 'lights') workspaceLights(scr, cx0, wy0, cx1, wy1);
   else workspaceStandby(scr, cx0, wy0, cx1, wy1, g);
+}
+
+/* ============================ SYSTEMS SCREEN ============================
+   UI configuration — everything about the INTERFACE itself (v0.3 spec):
+   era palette, ambient sound, voice interface. All persisted. */
+function renderSystems(scr, W, H) {
+  chrome(scr, W, H, 'CONSOLE · SYSTEMS', 'peri', 'peach');
+  scr.bar(0, EH, RAIL, 2.5, 'lilac', { top:true });
+  scr.text(0, EH + 1.75, RAIL - 0.25, 0.75, 'LCARS 47-2210', { fs:'data', color:'black', align:'right', weight:600 });
+  scr.bar(0, EH + 2.5, RAIL, 2.5, 'peri', { top:true });          // SYSTEMS block: you are here
+  scr.text(0, EH + 3.75, RAIL - 0.25, 0.75, '▶ SYSTEMS', { fs:'data', color:'black', align:'right', weight:700 });
+  railMode(scr, EH + 5, 2.5);                                     // mute reachable from config too
+  const ry = EH + 7.5;
+  scr.bar(0, ry, RAIL, (H - EH) - ry, 'peach', { top:true, bottom:true });
+
+  const cx0 = RAIL + GAP, cx1 = W - GAP;
+  const home = scr.button(cx0, BARH + 0.5, 4, 'MAIN', { color:'#d8c7ec', on:true, ends:'pill' });
+  scr.onTap(home, () => navigate('main'));
+  scr.text(cx1 - 18, BARH + 2, 18, 0.5, 'TERMINAL CONFIGURATION', { fs:'data', color:'orange', align:'right', ls:'.2em' });
+  scr.text(cx1 - 18, BARH + 2.5, 18, 2.5, 'SYSTEMS', { fs:'title', color:'orange', align:'right', weight:700 });
+  scr.text(cx1 - 18, BARH + 5, 18, 0.5, '', { fs:'data', color:'gold', align:'right' }).id = 'clk';
+
+  /* three config panels */
+  const y0 = BARH + 6.5, y1 = H - BARH - GAP;
+  const w3 = Math.floor(((cx1 - cx0) - 2 * GAP) / 3 * 4) / 4;
+  const panel = (i, color, title) => {
+    const x = cx0 + i * (w3 + GAP);
+    scr.shape(x, y0, w3, 1.1, { capRight:true, color });
+    scr.text(x + 0.5, y0, w3 - 1, 1.1, title, { fs:'sub', color:'black', weight:600 });
+    return x;
+  };
+
+  /* PALETTE — era skins; active selection highlighted, applies instantly */
+  const px0 = panel(0, 'peach', 'COLOR PALETTE');
+  scr.panel(px0, y0 + 1.35, w3, y1 - y0 - 1.35);
+  const activePal = LCARS.settings.get('palette', 'tng');
+  [['tng','TNG · GALAXY'], ['ds9','DS9 · CARDASSIAN'], ['voy','VOY · INTREPID']].forEach(([id, label], i) => {
+    const b = scr.button(px0 + 1, y0 + 2.25 + i * 2.5, w3 - 2, label,
+      { color: id === activePal ? 'peach' : 'lilac', on: id === activePal, ends:'pill' });
+    scr.onTap(b, () => { LCARS.settings.set('palette', id); LCARS.setPalette(id); render(); });
+  });
+
+  /* AUDIO — ambient + interaction sound flags (hooks for the sound pack) */
+  const ax0 = panel(1, 'gold', 'AUDIO');
+  scr.panel(ax0, y0 + 1.35, w3, y1 - y0 - 1.35);
+  [['ambient','AMBIENT SOUNDS'], ['beeps','INTERACTION BEEPS']].forEach(([key, label], i) => {
+    const on = LCARS.settings.get(key, true);
+    const b = scr.button(ax0 + 1, y0 + 2.25 + i * 2.5, w3 - 2, `${label} · ${on ? 'ON' : 'OFF'}`,
+      { color: on ? 'gold' : 'lilac', on, ends:'pill' });
+    scr.onTap(b, () => { LCARS.settings.set(key, !on); render(); });
+  });
+
+  /* VOICE INTERFACE — readouts now; wiring comes with the TTS/voice build */
+  const vx0 = panel(2, 'lilac', 'VOICE INTERFACE');
+  const vp = scr.panel(vx0, y0 + 1.35, w3, y1 - y0 - 1.35);
+  const muted = LCARS.settings.get('micMute', false);
+  vp.innerHTML = `<div class="clb">WAKE WORD <span class="v">COMPUTER</span><br>
+    VOICE <span class="v">MAJEL</span><br>
+    MIC STATUS ${muted ? '<span class="w">MUTED</span>' : '<span class="v">LIVE</span>'}</div>`;
+  const mb = scr.button(vx0 + 1, y1 - 2.5, w3 - 2, muted ? 'UNMUTE MIC' : 'MUTE MIC',
+    { color: muted ? 'lilac' : 'salmon', on: true, ends:'pill' });
+  scr.onTap(mb, () => { LCARS.settings.set('micMute', !muted); render(); });
 }
 
 /* LIGHTS workspace — interactive transporter dimmers (drag them!) */
