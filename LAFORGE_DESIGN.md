@@ -64,3 +64,74 @@ taps — right fit for a wall touch panel you pass constantly.
   sense — each methodology used where it's strongest.
 Sketches: `laforge_main_3.html` (main), `laforge_main_2.html` (subscreen pattern),
 `laforge_main_1.html` (HOME/MSD pattern).
+
+## v0.3 BACKLOG — Patrick's feedback on v0.2 (2026-07-03, session end)
+**Confirmed working/loved:** nav flow, content wipe, flavor-digit streams, overall detail
+level. Direction is correct — keep going exactly like this.
+
+1. **SYSTEMS button (left rail) = UI CONFIGURATION panel.** Everything that configures the
+   INTERFACE itself: color palette selection (**TNG / DS9 / VOY**), ambient sounds on/off,
+   computer voice interface settings, other UI-specific options.
+2. **MODE button (left rail) = MIC MUTE for the voice interface.** Not a power-off: ignore
+   all audio + stop caching it. When muted: button switches to the palette's INACTIVE color
+   and starts the breathing animation (the visual language for "present but not listening").
+3. **ALL settings persistent through restarts.** Prototype: localStorage. Phase 2: mirror to
+   HA helpers so any terminal/browser shares the same config.
+4. **Nav model change — hub-and-spoke (implement next session):** Main → subscreen and
+   subscreen → Main ONLY. Remove the group-to-group pill row from subscreens. Frees the
+   subscreen top section for flavor + screen-specific functional nav (e.g. LIGHTS gets
+   room/scene selectors up top instead of six global pills).
+5. **Screensaver:** dim out → spinning Federation logo. Asset candidate already catalogued:
+   `FedSign.gif` (lcars.org.uk CDN, "large spinning Federation logo") — or find a cleaner
+   gif/mp4. Any tap wakes.
+
+## SPOKE MAP v1 (2026-07-03) — every feature has an address
+Hub-and-spoke: MAIN glances everything; each spoke = one group subscreen with
+LOCAL VIEWS (its top pill row). Format: **VIEW — features (entities today → later)**.
+
+### LIGHTS (canary)
+- **ALL** — every fixture: dimmer columns + switch pills (light.backyard_light → TP-Link/Tuya dimmers)
+- **INTERIOR** — living/foyer/kitchen/bedroom fixtures (Alexa-only today → HA dimmers)
+- **EXTERIOR** — backyard flood + future porch/landscape
+- **SCENES** — EVENING / MOVIE / ALL OFF / GOODNIGHT (build as HA scenes in Phase 2)
+
+### SECURITY (salmon)
+- **CAMERAS** — 3 live feeds large + last-activity timestamps (camera.*, sensor.*_last_activity)
+- **PERIMETER** — motion-detect toggles, sirens, flood-as-deterrent (switch.*_motion_detection, siren.*)
+- **ALERTS** — alert-mode control (manual RED ALERT / STAND DOWN), siren automation status, event log
+
+### CLIMATE (lilac)
+- **CURRENT** — temp/condition/humidity/UV, sunrise/sunset (weather.forecast_home, sun.*)
+- **FORECAST** — hourly + 5-day columns
+- **SURVEY** — "planetary survey": Windy embed, radar · stretch: sea levels, moon phase
+
+### MEDIA (magenta)
+- **PLAYERS** — 4 Echoes: now playing, play/pause, per-device volume (media_player.*)
+- **ANNOUNCE** — ship-wide + per-room TTS announcements (→ Majel voice when TTS lab lands)
+- **VOLUME** — master audio + all device sliders in one place (number.*_volume)
+
+### HOME (peri)
+- **MSD** — the floor plan (floorplan.js). Rooms tap → room popup w/ that room's entities. THE flagship view.
+- **CALENDAR** — next events, day strip (Google Calendar via HA)
+- **ROUTINES** — Alexa routine buttons (good night / I'm home / kick off my day) + cats & litter status
+
+### CORE (peach)
+- **FRED** — CPU/RAM/load/disk/alarms gauges (sensor.fred_*)
+- **NETWORK** — WAN status/IP/speeds (arris sensors) → ntopng top-talkers later
+- **UPDATES** — HA core/addon/HACS update entities + backup status
+
+### Future spokes (post-v1, layout decision needed — 7th cluster changes the 3×2 grid)
+- **ASTROMETRICS** (chetwode?) — star maps / solar system embeds, flight radar, traffic cams
+- SYSTEMS is NOT a spoke — it's terminal chrome (rail button), config only.
+
+## STRETCH GOALS (recorded 2026-07-03 — thematically appropriate embeds)
+- Live **star maps / solar system state** from real astronomy databases — interactive and
+  embedded preferred (candidates to research: NASA Eyes on the Solar System embed,
+  Stellarium Web, Aladin Lite sky atlas).
+- **Windy embed** as "planetary survey data" (Science/CLIMATE screen).
+- **Sea levels, moon phases** (NOAA tides API; moon phase = easy compute or API).
+- **Airplane maps** (flight radar — ADS-B; candidates: FlightRadar24 embed, adsb.fi,
+  or a local ADS-B receiver on Fred someday).
+- **Traffic cameras** (state DOT public cams).
+- Standing rule: anything else that is cool, embeddable, and thematically appropriate —
+  collect candidates as found.

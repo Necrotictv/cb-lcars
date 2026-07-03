@@ -232,6 +232,7 @@ function renderGroup(scr, W, H, g) {
   /* ---- lower content: the group's workspace ---- */
   const wy0 = dy2 + DTH + GAP, wy1 = H - BARH - GAP;
   if (g.id === 'lights') workspaceLights(scr, cx0, wy0, cx1, wy1);
+  else if (g.id === 'home') workspaceHome(scr, cx0, wy0, cx1, wy1, g);
   else workspaceStandby(scr, cx0, wy0, cx1, wy1, g);
 }
 
@@ -338,6 +339,65 @@ function workspaceLights(scr, x0, y0, x1, y1) {
   st.innerHTML = `<div class="clb">ACTIVE FIXTURES <span class="v">3 / 5</span><br>
     POWER DRAW <span class="v">142 W</span><br>LAST EVENT <span class="v">KITCHEN 90%</span></div>`;
 }
+
+/* HOME workspace — the house as a Master Systems Display (floorplan.js data).
+   Rooms are tap targets; Phase 2 pops each room's entity controls. */
+function workspaceHome(scr, x0, y0, x1, y1, g) {
+  scr.shape(x0, y0, x1 - x0, 1.1, { capRight:true, color:g.color });
+  scr.text(x0 + 0.5, y0, 24, 1.1, 'RESIDENCE · MASTER SYSTEMS DISPLAY', { fs:'sub', color:'black', weight:600 });
+  const p = scr.panel(x0, y0 + 1.35, x1 - x0, y1 - y0 - 1.35);
+  p.style.padding = scr.U(0.5) + 'px';
+  const C = k => getComputedStyle(document.documentElement).getPropertyValue(k).trim();
+  renderMSD(p, C);
+  /* room taps: popups land with Phase-2 entity wiring — flash for now */
+  p.querySelectorAll('[data-room]').forEach(el =>
+    el.addEventListener('pointerdown', () => {
+      el.animate([{opacity:1},{opacity:.3},{opacity:1}], {duration:220});
+    }));
+}
+
+/* ============================ SCREENSAVER ============================
+   v0.3 spec: after idle, dim out to a spinning Federation logo. Any tap
+   wakes. Dev shortcut: press S to toggle instantly. Timeout is a setting. */
+const SAVER = {
+  timer: null, active: false,
+  mins() { return LCARS.settings.get('ssMinutes', 5); },
+  arm() { clearTimeout(this.timer);
+    if (!this.active) this.timer = setTimeout(() => this.start(), this.mins() * 60000); },
+  start() {
+    if (this.active) return; this.active = true;
+    const d = document.createElement('div');
+    d.id = 'saver';
+    /* FedSign.gif (lcars.org.uk, catalogued asset) with a text fallback if
+       the CDN ever dies — the saver must never render a broken-image icon */
+    d.innerHTML = `
+      <img src="https://www.lcars.org.uk/ano%20gifs/FedSign.gif" alt=""
+        onerror="this.remove();document.getElementById('saver-fallback').style.display='block'">
+      <div id="saver-fallback" style="display:none" class="saver-fb">UNITED FEDERATION OF PLANETS</div>
+      <div class="saver-clk" id="saver-clk"></div>`;
+    document.body.appendChild(d);
+    d.animate([{opacity:0},{opacity:1}], {duration:1500, fill:'forwards'});
+    const t = () => { const dt = new Date(), p = n => String(n).padStart(2,'0');
+      const el = document.getElementById('saver-clk');
+      if (el) el.textContent = p(dt.getHours()) + ':' + p(dt.getMinutes()); };
+    t(); this.clk = setInterval(t, 5000);
+    d.addEventListener('pointerdown', e => { e.stopPropagation(); this.stop(); });
+  },
+  stop() {
+    if (!this.active) return; this.active = false;
+    clearInterval(this.clk);
+    const d = document.getElementById('saver');
+    if (d) d.animate([{opacity:1},{opacity:0}], {duration:300, fill:'forwards'})
+      .onfinish = () => d.remove();
+    this.arm();
+  },
+};
+['pointerdown','pointermove','keydown'].forEach(ev =>
+  addEventListener(ev, () => { if (!SAVER.active) SAVER.arm(); }, { capture:true }));
+addEventListener('keydown', e => {
+  if (e.key.toLowerCase() === 's') SAVER.active ? SAVER.stop() : SAVER.start();
+});
+SAVER.arm();
 
 /* placeholder workspace for groups not built yet — still animated, still LCARS */
 function workspaceStandby(scr, x0, y0, x1, y1, g) {
