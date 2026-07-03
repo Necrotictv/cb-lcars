@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LaForge Main 2 — One-Tap Two-Frame (okudagram, de-clunked nav)</title>
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* MAIN OPTION 2 — "ONE-TAP TWO-FRAME"
+     Patrick's favorite okudagram silhouette, nav de-clunked:
+     stations are GONE — the upper frame holds ONE row of function-group
+     lozenges. Tap one → its controls swap into the lower frame in place.
+     Detail views = popups. Never leaves this screen. */
+  :root{
+    --u:20px;
+    --peach:#ff9966;--lilac:#cc99cc;--peri:#9999cc;--gold:#ffcc66;--salmon:#cc6666;
+    --canary:#f3f08b;--magenta:#cc6699;--orange:#ff9c00;--ebony:#20232c;--text:#d8c7ec;
+    --fs-title:calc(var(--u)*2.4);--fs-sub:calc(var(--u)*0.55);--fs-data:calc(var(--u)*0.40);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#000;color:var(--text);
+    font-family:'Antonio',sans-serif;letter-spacing:.06em;overflow:hidden}
+  .row{display:flex}
+  @keyframes breatheSoft{0%,100%{opacity:1}50%{opacity:.55}}
+  .scr{height:100vh;display:flex;flex-direction:column}
+  .blk{background:var(--lilac);color:#000;font-size:var(--fs-data);display:flex;align-items:flex-end;
+    justify-content:flex-end;padding:calc(var(--u)*0.2);text-transform:uppercase}
+  svg{display:block}
+
+  .topbar{height:calc(var(--u)*1.1);gap:calc(var(--u)*0.18);flex:0 0 auto;align-items:stretch}
+  .cap{width:calc(var(--u)*1.4);border-radius:calc(var(--u)*0.55) 0 0 calc(var(--u)*0.55);background:var(--peri)}
+  .tb-bar{flex:1;background:var(--lilac)}
+  .tb-txt{color:var(--orange);font-size:calc(var(--u)*0.85);font-weight:600;display:flex;align-items:center;
+    padding:0 calc(var(--u)*0.4);white-space:nowrap;text-transform:uppercase}
+  .tb-txt b{color:#fff;margin-left:.4em}
+
+  /* upper frame: SHORT — identity + one function row only (nav de-clunked) */
+  .upper{flex:0 0 calc(var(--u)*5.2)}
+  .rail{width:calc(var(--u)*6);display:flex;flex-direction:column;flex:0 0 auto}
+  .rail .blk{margin-bottom:calc(var(--u)*0.18)}
+  .uc{flex:1;position:relative;padding:calc(var(--u)*0.35) calc(var(--u)*0.6)}
+  .ident{position:absolute;top:0;right:calc(var(--u)*0.6);text-align:right}
+  .id-sta{font-size:var(--fs-data);color:var(--orange);letter-spacing:.2em}
+  .id-sys{font-size:var(--fs-title);font-weight:700;color:var(--orange);line-height:.95}
+  .id-clk{font-size:var(--fs-data);color:var(--gold)}
+  .lozrow{display:flex;gap:calc(var(--u)*0.35);margin-top:calc(var(--u)*0.4)}
+  /* touch-first: big 1.8u lozenges, one per function group, category colored */
+  .loz{height:calc(var(--u)*1.8);min-width:calc(var(--u)*7);border-radius:calc(var(--u)*0.9);
+    color:#000;font-size:var(--fs-sub);font-weight:500;display:flex;align-items:center;
+    justify-content:center;text-transform:uppercase;cursor:pointer}
+  .loz:not(.on){opacity:.55}
+  .loz.on{outline:calc(var(--u)*0.12) solid #fff;outline-offset:calc(var(--u)*0.15)}
+  .flavor{font-size:var(--fs-data);color:var(--orange);opacity:.8;letter-spacing:.14em;margin-top:calc(var(--u)*0.45)}
+
+  .divider{flex:0 0 auto;display:flex;flex-direction:column;gap:calc(var(--u)*0.14)}
+  .dvrow{display:flex;gap:calc(var(--u)*0.18);height:calc(var(--u)*0.55)}
+  .dvrow .s:last-child{border-radius:0 calc(var(--u)*0.3) calc(var(--u)*0.3) 0}
+
+  /* lower frame: the ACTIVE GROUP's controls, embedded */
+  .lower{flex:1;min-height:0}
+  .lc{flex:1;display:flex;gap:calc(var(--u)*0.8);padding:calc(var(--u)*0.7) calc(var(--u)*0.6);min-width:0}
+  .panel{flex:1;display:flex;flex-direction:column;min-width:0}
+  .ptitle{height:calc(var(--u)*1.1);border-radius:0 calc(var(--u)*0.55) calc(var(--u)*0.55) 0;
+    display:flex;align-items:center;padding-left:calc(var(--u)*0.5);color:#000;
+    font-size:var(--fs-sub);font-weight:600;text-transform:uppercase}
+  .pbody{flex:1;background:var(--ebony);margin-top:calc(var(--u)*0.3);padding:calc(var(--u)*0.6);
+    display:flex;gap:calc(var(--u)*0.8);align-items:stretch}
+  /* wireframe transporter sliders (canary = LIGHTS category) */
+  .sl{flex:1;display:flex;flex-direction:column;align-items:center;gap:calc(var(--u)*0.25)}
+  .sl .track{flex:1;width:70%;border:1px solid #444a63;border-radius:4px;position:relative}
+  .sl .fill{position:absolute;left:3px;right:3px;bottom:3px;background:var(--canary);opacity:.5}
+  .sl .handle{position:absolute;left:-2px;right:-2px;height:6px;background:var(--peach);border-radius:2px}
+  .sl .lab{font-size:var(--fs-data);color:var(--lilac)}
+  .sl .val{font-size:calc(var(--u)*0.7);color:var(--orange)}
+  .bigbtn{height:calc(var(--u)*1.8);border-radius:calc(var(--u)*0.9);background:var(--canary);
+    color:#000;font-size:var(--fs-sub);font-weight:600;display:flex;align-items:center;
+    justify-content:center;text-transform:uppercase;margin-top:calc(var(--u)*0.5);cursor:pointer}
+  .numcol{width:calc(var(--u)*7);font-size:var(--fs-data);color:var(--lilac);text-align:right;
+    line-height:1.6;letter-spacing:.12em;overflow:hidden}
+  .numcol .hi{color:#fff}
+
+  .console{height:calc(var(--u)*1.1);flex:0 0 auto;gap:calc(var(--u)*0.18);align-items:stretch}
+  .cs-label{color:var(--orange);font-size:calc(var(--u)*0.85);font-weight:600;display:flex;align-items:center;
+    padding:0 calc(var(--u)*0.4);text-transform:uppercase;white-space:nowrap}
+  .cs-bar{flex:1;background:var(--lilac)}
+  .capR{width:calc(var(--u)*1.4);border-radius:0 calc(var(--u)*0.55) calc(var(--u)*0.55) 0;background:var(--peri)}
+</style>
+</head>
+<body>
+<div class="scr">
+  <div class="row topbar">
+    <div class="cap"></div><div class="tb-bar"></div>
+    <div class="tb-txt">U.S.S. JARVIS · COMMAND INTERFACE READY <b>· ONLINE</b></div>
+  </div>
+
+  <!-- UPPER FRAME: identity + the ONE nav row (6 function groups, category-colored) -->
+  <div class="row upper">
+    <div class="rail">
+      <div class="blk" style="flex:1">LCARS 43-5489</div>
+      <div id="elbowU"></div>
+    </div>
+    <div class="uc">
+      <div class="lozrow">
+        <div class="loz on" style="background:var(--canary)">LIGHTS</div>
+        <div class="loz" style="background:var(--salmon)">SECURITY</div>
+        <div class="loz" style="background:var(--lilac)">CLIMATE</div>
+        <div class="loz" style="background:var(--magenta)">MEDIA</div>
+        <div class="loz" style="background:var(--peri)">HOME</div>
+        <div class="loz" style="background:var(--peach)">CORE</div>
+      </div>
+      <div class="flavor">48934312431&nbsp;&nbsp;478&nbsp;&nbsp;090343&nbsp;&nbsp;2385729385&nbsp;&nbsp;478</div>
+      <div class="ident">
+        <div class="id-sta">RESIDENCE</div>
+        <div class="id-sys">LIGHTS</div>
+        <div class="id-clk">STARDATE <span id="clock"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider" id="divider"></div>
+
+  <!-- LOWER FRAME: active group's controls, embedded (LIGHTS shown) -->
+  <div class="row lower">
+    <div class="rail">
+      <div id="elbowL"></div>
+      <div class="blk" style="flex:0 0 calc(var(--u)*2.4);background:var(--peri)">SYSTEMS</div>
+      <div class="blk" style="flex:0 0 calc(var(--u)*2.4);background:var(--gold)">MODE SELECT</div>
+      <div class="blk" style="flex:1;background:var(--peach)">490-0504</div>
+      <div id="elbowB"></div>
+    </div>
+    <div class="lc">
+      <div class="panel" style="flex:1.4"><div class="ptitle" style="background:var(--canary)">DIMMERS</div>
+        <div class="pbody">
+          <div class="sl"><div class="track"><div class="fill" style="height:72%"></div><div class="handle" style="bottom:72%"></div></div><div class="val">72</div><div class="lab">LIVING</div></div>
+          <div class="sl"><div class="track"><div class="fill" style="height:45%"></div><div class="handle" style="bottom:45%"></div></div><div class="val">45</div><div class="lab">FOYER</div></div>
+          <div class="sl"><div class="track"><div class="fill" style="height:90%"></div><div class="handle" style="bottom:90%"></div></div><div class="val">90</div><div class="lab">KITCHEN</div></div>
+        </div></div>
+      <div class="panel"><div class="ptitle" style="background:var(--peach)">SWITCHES</div>
+        <div class="pbody" style="flex-direction:column;justify-content:flex-start">
+          <div class="bigbtn" style="margin-top:0">BACKYARD FLOOD</div>
+          <div class="bigbtn" style="background:var(--peri)">ALL OFF</div>
+          <div class="bigbtn" style="background:var(--lilac)">SCENE · EVENING</div>
+        </div></div>
+      <div class="panel"><div class="ptitle" style="background:var(--lilac)">STATUS</div>
+        <div class="pbody" style="flex-direction:column;font-size:var(--fs-data);line-height:2;color:var(--text)">
+          ACTIVE FIXTURES <span style="color:var(--orange)">3 / 5</span><br>
+          POWER DRAW <span style="color:var(--orange)">142 W</span><br>
+          LAST EVENT <span style="color:var(--orange)">KITCHEN 90%</span>
+        </div></div>
+      <div class="numcol">24382938 123<br>34989 900<br>6252324 283<br>65967 323<br>5278894 538<br>
+        <span class="hi">874864 398</span><br>4234 093<br>64673245 437<br>3525423 588</div>
+    </div>
+  </div>
+
+  <div class="row console">
+    <div class="cs-label">CONSOLE · LIGHTS</div><div class="cs-bar"></div><div class="capR"></div>
+  </div>
+</div>
+<script>
+  // Locked elbow formulas (UI_STANDARDS §7)
+  const U=20, px=n=>n*U;
+  const Tv=6, Th=0.55, Ro=2, Ri=1, W=7.5, H=2.2;
+  const pBL=`M0 0 L${px(Tv)} 0 L${px(Tv)} ${px(H-Th-Ri)} Q${px(Tv)} ${px(H-Th)} ${px(Tv+Ri)} ${px(H-Th)} L${px(W)} ${px(H-Th)} L${px(W)} ${px(H)} L${px(Ro)} ${px(H)} Q0 ${px(H)} 0 ${px(H-Ro)} Z`;
+  const pTL=`M0 ${px(H)} L${px(Tv)} ${px(H)} L${px(Tv)} ${px(Th+Ri)} Q${px(Tv)} ${px(Th)} ${px(Tv+Ri)} ${px(Th)} L${px(W)} ${px(Th)} L${px(W)} 0 L${px(Ro)} 0 Q0 0 0 ${px(Ro)} Z`;
+  const svgEl=(p,c)=>`<svg width="${px(W)}" height="${px(H)}"><path d="${p}" fill="${c}"/></svg>`;
+  const C=k=>getComputedStyle(document.documentElement).getPropertyValue(k).trim();
+  document.getElementById('elbowU').innerHTML=svgEl(pBL,C('--salmon'));
+  document.getElementById('elbowL').innerHTML=svgEl(pTL,C('--peach'));
+  document.getElementById('elbowB').innerHTML=svgEl(pBL,C('--peach'));
+  const segs=[['--orange',2],['--lilac',14],['--gold',3],['--salmon',16],['--peri',7]];
+  const rowHtml=()=>`<div class="dvrow" style="margin-left:${px(W)+px(0.18)}px">`+
+    segs.map(([c,w])=>`<div class="s" style="width:${px(w)}px;background:${C(c)}"></div>`).join('')+`</div>`;
+  document.getElementById('divider').innerHTML=rowHtml()+rowHtml();
+  const tick=()=>{const d=new Date(),p=n=>String(n).padStart(2,'0');
+    document.getElementById('clock').textContent=p(d.getMonth()+1)+p(d.getDate())+d.getFullYear()+':'+p(d.getHours())+p(d.getMinutes())};
+  tick();setInterval(tick,1000);
+</script>
+</body>
+</html>

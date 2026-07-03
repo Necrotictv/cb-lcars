@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LaForge Sketch B — Working Console (lcarsladlondon density)</title>
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ============================================================
+     SKETCH B — "WORKING CONSOLE"
+     The lcarsladlondon dialect: thin slate frame, black-dominant,
+     dense instrument clusters, orange/teal accent data everywhere.
+     The frame recedes; INFORMATION is the interface.
+     Nav lives in a compact top band; everything else is content.
+     ============================================================ */
+  :root{
+    --u:20px;
+    /* lcarsladlondon palette: slate blues + orange/teal/red accents */
+    --slate:#9ba7c4;--slate-d:#39415e;--slate-dd:#232838;--orange:#f5a623;
+    --teal:#66ccd9;--red:#cc6666;--text:#c9d1e8;
+    --fs-title:calc(var(--u)*2.4);--fs-sub:calc(var(--u)*0.55);--fs-data:calc(var(--u)*0.40);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#000;color:var(--text);
+    font-family:'Antonio',sans-serif;letter-spacing:.08em;overflow:hidden}
+  .scr{height:100vh;display:flex;flex-direction:column;padding:calc(var(--u)*0.3);gap:calc(var(--u)*0.3)}
+
+  /* ---- thin top band: nav + identity, no chunky frame ---- */
+  .band{flex:0 0 calc(var(--u)*1.5);display:flex;align-items:stretch;gap:calc(var(--u)*0.15)}
+  .band .cap{width:calc(var(--u)*0.9);background:var(--slate-d);border-radius:calc(var(--u)*0.75) 0 0 calc(var(--u)*0.75)}
+  .band .capR{width:calc(var(--u)*0.9);background:var(--slate-d);border-radius:0 calc(var(--u)*0.75) calc(var(--u)*0.75) 0}
+  .tab{padding:0 calc(var(--u)*0.9);display:flex;align-items:center;background:var(--slate-d);
+    color:var(--slate);font-size:var(--fs-sub);text-transform:uppercase;cursor:pointer}
+  .tab.on{background:var(--orange);color:#000;font-weight:600}
+  .band .fill{flex:1;background:var(--slate-dd)}
+  .band .id{background:var(--slate-dd);display:flex;align-items:center;gap:calc(var(--u)*0.8);
+    padding:0 calc(var(--u)*0.8);font-size:var(--fs-data);color:var(--orange);white-space:nowrap}
+  .band .id b{color:#fff;font-weight:500}
+
+  /* ---- instrument grid ---- */
+  .grid{flex:1;display:grid;min-height:0;gap:calc(var(--u)*0.3);
+    grid-template-columns:1.2fr 1fr 1fr .55fr;grid-template-rows:1fr 1fr;
+    grid-template-areas:"dim wave cam data" "dim tbl tbl data"}
+  /* thin-outline instrument panel — the B look: 1px slate line, black interior */
+  .ins{border:1px solid var(--slate-d);border-radius:calc(var(--u)*0.25);position:relative;
+    padding:calc(var(--u)*0.9) calc(var(--u)*0.5) calc(var(--u)*0.5);min-height:0;overflow:hidden}
+  .ins>.tag{position:absolute;top:0;left:calc(var(--u)*0.5);transform:translateY(-1px);
+    background:var(--slate-d);color:var(--slate);font-size:var(--fs-data);letter-spacing:.16em;
+    padding:calc(var(--u)*0.06) calc(var(--u)*0.4);border-radius:0 0 calc(var(--u)*0.2) calc(var(--u)*0.2);
+    text-transform:uppercase}
+  .ins>.code{position:absolute;top:calc(var(--u)*0.12);right:calc(var(--u)*0.4);
+    font-size:var(--fs-data);color:var(--orange)}
+
+  /* vertical transporter sliders (dimmers) */
+  .sliders{display:flex;height:100%;gap:calc(var(--u)*0.7);align-items:stretch;justify-content:center}
+  .sl{display:flex;flex-direction:column;align-items:center;gap:calc(var(--u)*0.25);flex:0 1 calc(var(--u)*2.4)}
+  .sl .track{flex:1;width:100%;border:1px solid var(--slate-d);border-radius:calc(var(--u)*0.2);
+    position:relative;background:repeating-linear-gradient(to top,transparent 0,transparent 7px,var(--slate-dd) 7px,var(--slate-dd) 8px)}
+  .sl .fill{position:absolute;left:2px;right:2px;bottom:2px;background:var(--teal);opacity:.65;border-radius:2px}
+  .sl .handle{position:absolute;left:-2px;right:-2px;height:6px;background:var(--orange);border-radius:2px}
+  .sl .lab{font-size:var(--fs-data);color:var(--slate);text-transform:uppercase}
+  .sl .val{font-size:calc(var(--u)*0.7);color:var(--orange)}
+
+  /* waveform block */
+  .wave{height:100%;display:flex;align-items:center}
+  .wavebars{width:100%;height:70%;
+    background:repeating-linear-gradient(to right,var(--teal) 0,var(--teal) 2px,transparent 2px,transparent 5px);
+    -webkit-mask-image:linear-gradient(to bottom,transparent 0%,#000 18%,#000 30%,transparent 47%,transparent 53%,#000 70%,#000 82%,transparent 100%);
+    mask-image:linear-gradient(to bottom,transparent 0%,#000 18%,#000 30%,transparent 47%,transparent 53%,#000 70%,#000 82%,transparent 100%);
+    animation:shimmer 6s linear infinite;opacity:.8}
+  @keyframes shimmer{0%,100%{opacity:.55}50%{opacity:.9}}
+
+  /* camera / viewscreen placeholder: angled trapezoid outline, Voyager-style */
+  .trap{height:100%;display:flex;gap:calc(var(--u)*0.4)}
+  .trap .cell{flex:1;border:1px solid var(--slate);border-radius:4px;position:relative;
+    clip-path:polygon(6% 0,94% 0,100% 12%,100% 100%,0 100%,0 12%);background:#0a0c12}
+  .trap .cell::after{content:"NO SIGNAL · STANDBY";position:absolute;inset:auto 0 8px 0;text-align:center;
+    font-size:var(--fs-data);color:var(--slate-d);letter-spacing:.2em}
+
+  /* data table rows */
+  .rows{display:flex;flex-direction:column;gap:calc(var(--u)*0.18);height:100%;justify-content:center}
+  .r{display:flex;gap:calc(var(--u)*0.15);align-items:center;font-size:var(--fs-data)}
+  .r .k{width:calc(var(--u)*4);background:var(--slate-dd);color:var(--slate);padding:calc(var(--u)*0.14) calc(var(--u)*0.3);
+    text-transform:uppercase}
+  .r .bar{flex:1;height:calc(var(--u)*0.55);background:var(--slate-dd);position:relative}
+  .r .bar i{position:absolute;left:0;top:0;bottom:0;background:var(--slate)}
+  .r .v{width:calc(var(--u)*3);text-align:right;color:var(--orange)}
+  .r.warn .v{color:var(--red)} .r.warn .bar i{background:var(--red)}
+
+  /* right numbers column */
+  .numstack{display:flex;flex-direction:column;height:100%;justify-content:space-between;
+    font-size:var(--fs-data);line-height:1.65;text-align:right;color:var(--slate);letter-spacing:.14em}
+  .numstack .hi{color:var(--orange)} .numstack .hi2{color:#fff}
+
+  /* ---- thin bottom band ---- */
+  .bband{flex:0 0 calc(var(--u)*0.9);display:flex;gap:calc(var(--u)*0.15);align-items:stretch;
+    font-size:var(--fs-data)}
+  .bband .cap{width:calc(var(--u)*0.7);background:var(--slate-d);border-radius:calc(var(--u)*0.45) 0 0 calc(var(--u)*0.45)}
+  .bband .capR{width:calc(var(--u)*0.7);background:var(--slate-d);border-radius:0 calc(var(--u)*0.45) calc(var(--u)*0.45) 0}
+  .bband .seg{background:var(--slate-dd);color:var(--slate);display:flex;align-items:center;
+    padding:0 calc(var(--u)*0.5);text-transform:uppercase;white-space:nowrap}
+  .bband .fill{flex:1;background:var(--slate-dd)}
+  .bband .seg.o{color:var(--orange)}
+</style>
+</head>
+<body>
+<div class="scr">
+
+  <!-- TOP BAND: stations as flat tabs + systems + identity readout. Nav is compact; content is king. -->
+  <div class="band">
+    <div class="cap"></div>
+    <div class="tab on">COMMAND</div><div class="tab">SECURITY</div><div class="tab">SCIENCE</div><div class="tab">ENGR</div>
+    <div class="fill"></div>
+    <div class="tab on" style="background:var(--teal)">LIGHTING</div><div class="tab">CLIMATE</div><div class="tab">VIDEO</div><div class="tab">SOUND</div>
+    <div class="id">LCARS 47-2210 <b id="clock">—</b> · ONLINE</div>
+    <div class="capR"></div>
+  </div>
+
+  <!-- INSTRUMENT GRID -->
+  <div class="grid">
+    <div class="ins" style="grid-area:dim"><div class="tag">Lighting · Dimmers</div><div class="code">41·354</div>
+      <div class="sliders">
+        <div class="sl"><div class="track"><div class="fill" style="height:72%"></div><div class="handle" style="bottom:72%"></div></div><div class="val">72</div><div class="lab">LIVING</div></div>
+        <div class="sl"><div class="track"><div class="fill" style="height:45%"></div><div class="handle" style="bottom:45%"></div></div><div class="val">45</div><div class="lab">FOYER</div></div>
+        <div class="sl"><div class="track"><div class="fill" style="height:90%"></div><div class="handle" style="bottom:90%"></div></div><div class="val">90</div><div class="lab">KITCHEN</div></div>
+        <div class="sl"><div class="track"><div class="fill" style="height:20%"></div><div class="handle" style="bottom:20%"></div></div><div class="val">20</div><div class="lab">BEDRM</div></div>
+        <div class="sl"><div class="track"><div class="fill" style="height:0%"></div><div class="handle" style="bottom:0%"></div></div><div class="val">OFF</div><div class="lab">BACKYD</div></div>
+      </div>
+    </div>
+    <div class="ins" style="grid-area:wave"><div class="tag">Subspace Com Wave 0018</div><div class="code">58·5939</div>
+      <div class="wave"><div class="wavebars"></div></div>
+    </div>
+    <div class="ins" style="grid-area:cam"><div class="tag">Visual Sensors</div><div class="code">D·730</div>
+      <div class="trap"><div class="cell"></div><div class="cell"></div></div>
+    </div>
+    <div class="ins" style="grid-area:tbl"><div class="tag">Environmental · Fred Core</div><div class="code">M·15</div>
+      <div class="rows">
+        <div class="r"><div class="k">CPU LOAD</div><div class="bar"><i style="width:34%"></i></div><div class="v">34%</div></div>
+        <div class="r"><div class="k">MEMORY</div><div class="bar"><i style="width:61%"></i></div><div class="v">61%</div></div>
+        <div class="r"><div class="k">NET IN</div><div class="bar"><i style="width:22%"></i></div><div class="v">18 MB</div></div>
+        <div class="r"><div class="k">NET OUT</div><div class="bar"><i style="width:12%"></i></div><div class="v">6 MB</div></div>
+        <div class="r warn"><div class="k">ALARMS</div><div class="bar"><i style="width:8%"></i></div><div class="v">1</div></div>
+      </div>
+    </div>
+    <div class="ins" style="grid-area:data"><div class="tag">LCARS</div><div class="code">632</div>
+      <div class="numstack">
+        <div>95 485<br>95 490<br><span class="hi">95 497</span></div>
+        <div>41·354<br>44·5134<br>44·739<br><span class="hi2">80·15 91</span></div>
+        <div>03-17<br>07-82<br><span class="hi">727-33</span></div>
+        <div>420861-68459<br>78-822932-34</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM BAND: thin status rail -->
+  <div class="bband">
+    <div class="cap"></div>
+    <div class="seg o">CONSOLE · COMMAND</div><div class="seg">SUBSPACE RELAY</div>
+    <div class="fill"></div>
+    <div class="seg">80·1284</div><div class="seg o">ALL SYSTEMS NOMINAL</div>
+    <div class="capR"></div>
+  </div>
+</div>
+
+<script>
+  // live clock in the identity readout
+  const tick=()=>{const d=new Date(),p=n=>String(n).padStart(2,'0');
+    document.getElementById('clock').textContent=p(d.getMonth()+1)+p(d.getDate())+d.getFullYear()+':'+p(d.getHours())+p(d.getMinutes())};
+  tick();setInterval(tick,1000);
+</script>
+</body>
+</html>

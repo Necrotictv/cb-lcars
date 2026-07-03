@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LaForge Main 3 — Glance Grid (everything visible, one tap to control)</title>
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* MAIN OPTION 3 — "GLANCE GRID"
+     One okudagram frame; ALL six function groups visible at once as live
+     clusters. Zero taps to see the whole house; tap any cluster header →
+     that group's full subscreen/popup. Nav IS the content. */
+  :root{
+    --u:20px;
+    --peach:#ff9966;--lilac:#cc99cc;--peri:#9999cc;--gold:#ffcc66;--salmon:#cc6666;
+    --canary:#f3f08b;--magenta:#cc6699;--orange:#ff9c00;--ebony:#20232c;--text:#d8c7ec;
+    --fs-title:calc(var(--u)*2.4);--fs-sub:calc(var(--u)*0.55);--fs-data:calc(var(--u)*0.40);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#000;color:var(--text);
+    font-family:'Antonio',sans-serif;letter-spacing:.06em;overflow:hidden}
+  .row{display:flex}
+  .scr{height:100vh;display:flex;flex-direction:column}
+  .blk{background:var(--lilac);color:#000;font-size:var(--fs-data);display:flex;align-items:flex-end;
+    justify-content:flex-end;padding:calc(var(--u)*0.2);text-transform:uppercase}
+  svg{display:block}
+
+  .topbar{height:calc(var(--u)*1.1);gap:calc(var(--u)*0.18);flex:0 0 auto;align-items:stretch}
+  .cap{width:calc(var(--u)*1.4);border-radius:calc(var(--u)*0.55) 0 0 calc(var(--u)*0.55);background:var(--peri)}
+  .tb-bar{flex:1;background:var(--lilac)}
+  .tb-txt{color:var(--orange);font-size:calc(var(--u)*0.85);font-weight:600;display:flex;align-items:center;
+    padding:0 calc(var(--u)*0.4);white-space:nowrap;text-transform:uppercase}
+  .tb-txt b{color:#fff;margin-left:.4em}
+
+  .main{flex:1;min-height:0}
+  .rail{width:calc(var(--u)*6);flex:0 0 auto;display:flex;flex-direction:column}
+  .rail .blk{margin-bottom:calc(var(--u)*0.18)}
+  .content{flex:1;position:relative;padding:calc(var(--u)*0.6);min-width:0;display:flex;flex-direction:column}
+  .ident{text-align:right;position:absolute;top:calc(var(--u)*0.2);right:calc(var(--u)*0.8)}
+  .id-sta{font-size:var(--fs-data);color:var(--orange);letter-spacing:.2em}
+  .id-sys{font-size:var(--fs-title);font-weight:700;color:var(--orange);line-height:.95}
+  .id-clk{font-size:var(--fs-data);color:var(--gold)}
+
+  /* the glance grid: 3×2 clusters, each headed by its category-color capped bar (tap target) */
+  .grid{flex:1;display:grid;gap:calc(var(--u)*0.5);margin-top:calc(var(--u)*3.4);min-height:0;
+    grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr}
+  .cl{display:flex;flex-direction:column;min-height:0}
+  .clh{height:calc(var(--u)*1.3);border-radius:calc(var(--u)*0.65);display:flex;align-items:center;
+    padding-left:calc(var(--u)*0.6);color:#000;font-size:var(--fs-sub);font-weight:600;
+    text-transform:uppercase;cursor:pointer}
+  .clh span{margin-left:auto;padding-right:calc(var(--u)*0.6);font-size:var(--fs-data);font-weight:500}
+  .clb{flex:1;background:var(--ebony);margin-top:calc(var(--u)*0.25);padding:calc(var(--u)*0.4);
+    font-size:var(--fs-data);line-height:1.9;overflow:hidden}
+  .clb .v{color:var(--orange)} .clb .w{color:var(--salmon)}
+  /* mini horizontal bars for quick levels */
+  .mb{display:flex;align-items:center;gap:calc(var(--u)*0.3);margin:calc(var(--u)*0.12) 0}
+  .mb .k{width:calc(var(--u)*3.2);text-transform:uppercase;color:var(--lilac)}
+  .mb .t{flex:1;height:calc(var(--u)*0.5);background:#12141c;position:relative;border-radius:2px}
+  .mb .t i{position:absolute;left:0;top:0;bottom:0;background:var(--canary);border-radius:2px}
+  .mb .n{width:calc(var(--u)*1.6);text-align:right;color:var(--orange)}
+  /* camera thumbs */
+  .cams{display:flex;gap:calc(var(--u)*0.3);height:70%}
+  .cam{flex:1;background:#0a0c12;border:1px solid #39415e;border-radius:4px;position:relative}
+  .cam::after{content:attr(data-n);position:absolute;bottom:4px;left:6px;font-size:calc(var(--u)*0.35);
+    color:var(--peri);letter-spacing:.15em}
+
+  .console{height:calc(var(--u)*1.1);flex:0 0 auto;gap:calc(var(--u)*0.18);align-items:stretch}
+  .cs-label{color:var(--orange);font-size:calc(var(--u)*0.85);font-weight:600;display:flex;align-items:center;
+    padding:0 calc(var(--u)*0.4);text-transform:uppercase;white-space:nowrap}
+  .cs-bar{flex:1;background:var(--lilac)}
+  .capR{width:calc(var(--u)*1.4);border-radius:0 calc(var(--u)*0.55) calc(var(--u)*0.55) 0;background:var(--peri)}
+</style>
+</head>
+<body>
+<div class="scr">
+  <div class="row topbar">
+    <div class="cap"></div><div class="tb-bar"></div>
+    <div class="tb-txt">U.S.S. JARVIS · ALL SYSTEMS DISPLAY <b>· ONLINE</b></div>
+  </div>
+
+  <div class="row main">
+    <div class="rail">
+      <div class="blk" style="flex:0 0 calc(var(--u)*1.6)">LCARS 47-2210</div>
+      <div id="elbowT"></div>
+      <div class="blk" style="flex:0 0 calc(var(--u)*2.4);background:var(--peri)">SYSTEMS</div>
+      <div class="blk" style="flex:0 0 calc(var(--u)*2.4);background:var(--gold)">MODE SELECT</div>
+      <div class="blk" style="flex:1;background:var(--peach)">490-0504</div>
+      <div id="elbowB"></div>
+    </div>
+
+    <div class="content">
+      <div class="ident">
+        <div class="id-sta">RESIDENCE</div>
+        <div class="id-sys">OVERVIEW</div>
+        <div class="id-clk">STARDATE <span id="clock"></span></div>
+      </div>
+
+      <div class="grid">
+        <div class="cl"><div class="clh" style="background:var(--canary)">LIGHTS<span>3/5 ON</span></div>
+          <div class="clb">
+            <div class="mb"><div class="k">LIVING</div><div class="t"><i style="width:72%"></i></div><div class="n">72</div></div>
+            <div class="mb"><div class="k">FOYER</div><div class="t"><i style="width:45%"></i></div><div class="n">45</div></div>
+            <div class="mb"><div class="k">KITCHEN</div><div class="t"><i style="width:90%"></i></div><div class="n">90</div></div>
+            <div class="mb"><div class="k">BACKYD</div><div class="t"></div><div class="n">OFF</div></div>
+          </div></div>
+        <div class="cl"><div class="clh" style="background:var(--salmon)">SECURITY<span>GREEN</span></div>
+          <div class="clb"><div class="cams">
+            <div class="cam" data-n="FRONT DOOR"></div><div class="cam" data-n="BACKYARD"></div><div class="cam" data-n="DOWNSTAIRS"></div></div>
+            MOTION <span class="v">ARMED</span> · SIRENS <span class="v">STANDBY</span>
+          </div></div>
+        <div class="cl"><div class="clh" style="background:var(--lilac)">CLIMATE<span>71°F</span></div>
+          <div class="clb">CONDITION <span class="v">CLEAR</span><br>HUMIDITY <span class="v">44%</span><br>
+            SUNSET <span class="v">20:31</span> · UV <span class="v">3</span></div></div>
+        <div class="cl"><div class="clh" style="background:var(--magenta)">MEDIA<span>IDLE</span></div>
+          <div class="clb">DOWNSTAIRS <span class="v">VOL 6</span><br>EVERYWHERE <span class="v">STANDBY</span><br>
+            ANNOUNCE <span class="v">READY</span></div></div>
+        <div class="cl"><div class="clh" style="background:var(--peri)">HOME<span>2 EVENTS</span></div>
+          <div class="clb">14:00 <span class="v">STANDUP</span><br>18:30 <span class="v">FILM SESSION</span><br>
+            LITTER ROBOT <span class="v">CYCLED 12:40</span></div></div>
+        <div class="cl"><div class="clh" style="background:var(--peach)">CORE<span>NOMINAL</span></div>
+          <div class="clb">
+            <div class="mb"><div class="k">CPU</div><div class="t"><i style="width:34%;background:var(--peach)"></i></div><div class="n">34</div></div>
+            <div class="mb"><div class="k">MEM</div><div class="t"><i style="width:61%;background:var(--peach)"></i></div><div class="n">61</div></div>
+            WAN <span class="v">ONLINE</span> · ALARMS <span class="w">1</span>
+          </div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row console">
+    <div class="cs-label">CONSOLE · OVERVIEW</div><div class="cs-bar"></div><div class="capR"></div>
+  </div>
+</div>
+<script>
+  // Locked elbow formulas (UI_STANDARDS §7) — rail curves into top bar and console bar
+  const U=20, px=n=>n*U;
+  const Tv=6, Th=0.55, Ro=2, Ri=1, W=7.5, H=2.2;
+  const pBL=`M0 0 L${px(Tv)} 0 L${px(Tv)} ${px(H-Th-Ri)} Q${px(Tv)} ${px(H-Th)} ${px(Tv+Ri)} ${px(H-Th)} L${px(W)} ${px(H-Th)} L${px(W)} ${px(H)} L${px(Ro)} ${px(H)} Q0 ${px(H)} 0 ${px(H-Ro)} Z`;
+  const pTL=`M0 ${px(H)} L${px(Tv)} ${px(H)} L${px(Tv)} ${px(Th+Ri)} Q${px(Tv)} ${px(Th)} ${px(Tv+Ri)} ${px(Th)} L${px(W)} ${px(Th)} L${px(W)} 0 L${px(Ro)} 0 Q0 0 0 ${px(Ro)} Z`;
+  const svgEl=(p,c)=>`<svg width="${px(W)}" height="${px(H)}"><path d="${p}" fill="${c}"/></svg>`;
+  const C=k=>getComputedStyle(document.documentElement).getPropertyValue(k).trim();
+  document.getElementById('elbowT').innerHTML=svgEl(pTL,C('--lilac'));
+  document.getElementById('elbowB').innerHTML=svgEl(pBL,C('--peach'));
+  const tick=()=>{const d=new Date(),p=n=>String(n).padStart(2,'0');
+    document.getElementById('clock').textContent=p(d.getMonth()+1)+p(d.getDate())+d.getFullYear()+':'+p(d.getHours())+p(d.getMinutes())};
+  tick();setInterval(tick,1000);
+</script>
+</body>
+</html>

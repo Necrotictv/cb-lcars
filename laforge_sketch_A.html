@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LaForge Sketch A — Okudagram Two-Frame (intro2 faithful)</title>
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ============================================================
+     SKETCH A — "OKUDAGRAM TWO-FRAME"
+     The approved V4 concept, rendered by the LaForge standards.
+     Two complete LCARS frames meet at a segmented divider tube:
+     UPPER = navigation (identity, stations, systems), collapsible.
+     LOWER = working controls, closed by the console bar.
+     Chunky TNG pastels, screen-accurate silhouette.
+     ============================================================ */
+  :root{
+    --u:20px;                                   /* one LCARS unit — everything scales off this */
+    /* intro2 palette: TNG pastels on black */
+    --peach:#ff9966;--lilac:#cc99cc;--peri:#9999cc;--gold:#ffcc66;--salmon:#cc6666;
+    --orange:#ff9c00;--ebony:#20232c;--text:#d8c7ec;
+    --fs-title:calc(var(--u)*2.4);--fs-sub:calc(var(--u)*0.55);--fs-data:calc(var(--u)*0.40);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#000;color:var(--text);
+    font-family:'Antonio',sans-serif;letter-spacing:.06em;overflow:hidden}
+  .scr{height:100vh;display:flex;flex-direction:column}
+  .row{display:flex}
+  /* generic frame block (rail segments, bars) */
+  .blk{background:var(--lilac);color:#000;font-size:var(--fs-data);display:flex;
+    align-items:flex-end;justify-content:flex-end;padding:calc(var(--u)*0.2);text-transform:uppercase}
+  svg{display:block}
+  @keyframes breathe{0%,100%{opacity:1}50%{opacity:.5}}
+
+  /* ---- top bar of upper frame ---- */
+  .topbar{height:calc(var(--u)*1.1);gap:calc(var(--u)*0.18);align-items:stretch;flex:0 0 auto}
+  .cap{width:calc(var(--u)*1.4);border-radius:calc(var(--u)*0.55) 0 0 calc(var(--u)*0.55);background:var(--peri)}
+  .tb-bar{flex:1;background:var(--lilac)}
+  .tb-txt{color:var(--orange);font-size:calc(var(--u)*0.85);font-weight:600;display:flex;align-items:center;
+    padding:0 calc(var(--u)*0.4);text-transform:uppercase;white-space:nowrap}
+  .tb-txt b{color:#fff;margin-left:.4em}
+
+  /* ---- upper frame (nav) ---- */
+  .upper{flex:0 0 calc(var(--u)*7.4)}
+  .rail{width:calc(var(--u)*6);display:flex;flex-direction:column;flex:0 0 auto}
+  .rail .blk{margin-bottom:calc(var(--u)*0.18)}
+  .uc{flex:1;position:relative;padding:calc(var(--u)*0.4) calc(var(--u)*0.6);display:flex;flex-direction:column}
+  .ident{position:absolute;top:0;right:calc(var(--u)*0.6);text-align:right}
+  .id-sta{font-size:var(--fs-data);color:var(--orange);letter-spacing:.2em}
+  .id-sys{font-size:var(--fs-title);font-weight:700;color:var(--orange);line-height:.95;text-transform:uppercase}
+  .id-clk{font-size:var(--fs-data);color:var(--gold)}
+  .flavor{font-size:var(--fs-data);color:var(--orange);opacity:.85;line-height:1.5;letter-spacing:.14em}
+  .lozrow{display:flex;gap:calc(var(--u)*0.3);margin-top:calc(var(--u)*0.45)}
+  .loz{height:calc(var(--u)*1.35);min-width:calc(var(--u)*6.5);border-radius:calc(var(--u)*0.7);
+    background:var(--peri);color:#000;font-size:var(--fs-sub);font-weight:500;display:flex;
+    align-items:center;justify-content:center;text-transform:uppercase;cursor:pointer}
+  .loz.on{background:var(--peach)}
+  .loz.sm{min-width:calc(var(--u)*5.2);background:var(--lilac)}
+  .loz.sm.on{background:var(--gold)}
+  .collapse{position:absolute;right:calc(var(--u)*0.6);bottom:calc(var(--u)*0.3);height:calc(var(--u)*1.1);
+    padding:0 calc(var(--u)*0.8);border-radius:calc(var(--u)*0.55);background:var(--salmon);color:#000;
+    font-size:var(--fs-data);display:flex;align-items:center;font-weight:600}
+
+  /* ---- divider tube: two half-rows separated by a black seam ---- */
+  .divider{flex:0 0 auto;display:flex;flex-direction:column;gap:calc(var(--u)*0.14)}
+  .dvrow{display:flex;gap:calc(var(--u)*0.18);height:calc(var(--u)*0.55)}
+  .dvrow .s{border-radius:0}
+  .dvrow .s:last-child{border-radius:0 calc(var(--u)*0.3) calc(var(--u)*0.3) 0}
+
+  /* ---- lower frame (controls) ---- */
+  .lower{flex:1;min-height:0}
+  .lc{flex:1;display:flex;gap:calc(var(--u)*0.8);padding:calc(var(--u)*0.7) calc(var(--u)*0.6);min-width:0}
+  .panel{flex:1;display:flex;flex-direction:column;min-width:0}
+  .ptitle{height:calc(var(--u)*1.1);border-radius:0 calc(var(--u)*0.55) calc(var(--u)*0.55) 0;
+    display:flex;align-items:center;padding-left:calc(var(--u)*0.5);color:#000;
+    font-size:var(--fs-sub);font-weight:600;text-transform:uppercase}
+  .pbody{flex:1;background:var(--ebony);margin-top:calc(var(--u)*0.3)}
+  /* right flavor-number column, like intro2 */
+  .numcol{width:calc(var(--u)*7);font-size:var(--fs-data);color:var(--lilac);text-align:right;
+    line-height:1.6;letter-spacing:.12em;overflow:hidden}
+  .numcol .hi{color:#fff}
+
+  /* ---- console bar ---- */
+  .console{height:calc(var(--u)*1.1);flex:0 0 auto;gap:calc(var(--u)*0.18);align-items:stretch}
+  .cs-label{color:var(--orange);font-size:calc(var(--u)*0.85);font-weight:600;display:flex;
+    align-items:center;padding:0 calc(var(--u)*0.4);text-transform:uppercase;white-space:nowrap}
+  .cs-bar{flex:1;background:var(--lilac)}
+  .capR{width:calc(var(--u)*1.4);border-radius:0 calc(var(--u)*0.55) calc(var(--u)*0.55) 0;background:var(--peri)}
+</style>
+</head>
+<body>
+<div class="scr">
+
+  <!-- TOP BAR: left cap + lilac bar + status text (intro2 row 1) -->
+  <div class="row topbar">
+    <div class="cap"></div><div class="tb-bar"></div>
+    <div class="tb-txt">U.S.S. JARVIS · COMMAND INTERFACE READY <b>· ONLINE</b></div>
+  </div>
+
+  <!-- UPPER FRAME: rail w/ code blocks + BL elbow; content = identity + station/system lozenges -->
+  <div class="row upper">
+    <div class="rail" id="railU">
+      <div class="blk" style="flex:1">LCARS 43-5489</div>
+      <div class="blk" style="flex:1;background:var(--peri)">230-661</div>
+      <div id="elbowU"></div><!-- bottom-left elbow, sweeps into divider top half -->
+    </div>
+    <div class="uc">
+      <div class="flavor">48934312431&nbsp;&nbsp;478&nbsp;&nbsp;090343&nbsp;&nbsp;2385729385&nbsp;&nbsp;478&nbsp;&nbsp;378783232<br>
+        54682435221&nbsp;&nbsp;442&nbsp;&nbsp;564&nbsp;&nbsp;342778&nbsp;&nbsp;334&nbsp;&nbsp;121216277</div>
+      <div class="lozrow">
+        <div class="loz on">COMMAND</div><div class="loz">SECURITY</div>
+        <div class="loz">SCIENCE</div><div class="loz">ENGINEERING</div>
+      </div>
+      <div class="lozrow">
+        <div class="loz sm on">LIGHTING</div><div class="loz sm">CLIMATE</div>
+        <div class="loz sm">VIDEO</div><div class="loz sm">SOUND</div>
+      </div>
+      <div class="ident">
+        <div class="id-sta">COMMAND</div>
+        <div class="id-sys">LIGHTING</div>
+        <div class="id-clk">STARDATE <span id="clock"></span></div>
+      </div>
+      <div class="collapse">▲ COLLAPSE</div>
+    </div>
+  </div>
+
+  <!-- DIVIDER: segmented tube where the two frames meet -->
+  <div class="divider" id="divider"></div>
+
+  <!-- LOWER FRAME: TL elbow + rail blocks; content = working panels + flavor numbers -->
+  <div class="row lower">
+    <div class="rail">
+      <div id="elbowL"></div><!-- top-left elbow, sweeps from divider bottom half into the rail -->
+      <div class="blk" style="flex:0 0 calc(var(--u)*2.4);background:var(--peri)">SYSTEMS</div>
+      <div class="blk" style="flex:0 0 calc(var(--u)*2.4);background:var(--gold)">MODE SELECT</div>
+      <div class="blk" style="flex:1;background:var(--peach)">490-0504</div>
+      <div id="elbowB"></div><!-- bottom-left elbow closes the frame into the console bar -->
+    </div>
+    <div class="lc">
+      <div class="panel"><div class="ptitle" style="background:var(--peach)">LIGHTING · DIMMERS</div><div class="pbody"></div></div>
+      <div class="panel"><div class="ptitle" style="background:var(--lilac)">CLIMATE</div><div class="pbody"></div></div>
+      <div class="panel"><div class="ptitle" style="background:var(--peri)">VIEWSCREEN</div><div class="pbody"></div></div>
+      <div class="numcol">24382938 123 993489<br>34989 900 090<br>6252324 283 23499<br>65967 323 42993<br>
+        5278894 538 429<br>76874 438 12315<br>5345 249 4090<br><span class="hi">874864 398 47834</span><br>
+        4234 093 29842<br>64673245 437 0903<br>3525423 588 00034<br>2134299 349 LCARS</div>
+    </div>
+  </div>
+
+  <!-- CONSOLE BAR -->
+  <div class="row console">
+    <div class="cs-label">CONSOLE · COMMAND</div><div class="cs-bar"></div><div class="capR"></div>
+  </div>
+</div>
+
+<script>
+  // Elbows come from the LOCKED createRadiusPath-derived formulas (UI_STANDARDS §7) — never eyeballed.
+  const U=20, px=n=>n*U;
+  // params: rail width Tv=6u here (chunkier intro2 rail), divider half Th=0.55, radii Ro=2/Ri=1
+  const Tv=6, Th=0.55, Ro=2, Ri=1, W=7.5, H=2.2;
+  // bottom-left elbow: vertical arm up, horizontal arm along the bottom edge
+  const pBL=`M0 0 L${px(Tv)} 0 L${px(Tv)} ${px(H-Th-Ri)} Q${px(Tv)} ${px(H-Th)} ${px(Tv+Ri)} ${px(H-Th)} L${px(W)} ${px(H-Th)} L${px(W)} ${px(H)} L${px(Ro)} ${px(H)} Q0 ${px(H)} 0 ${px(H-Ro)} Z`;
+  // top-left elbow: vertical mirror
+  const pTL=`M0 ${px(H)} L${px(Tv)} ${px(H)} L${px(Tv)} ${px(Th+Ri)} Q${px(Tv)} ${px(Th)} ${px(Tv+Ri)} ${px(Th)} L${px(W)} ${px(Th)} L${px(W)} 0 L${px(Ro)} 0 Q0 0 0 ${px(Ro)} Z`;
+  const svg=(p,c)=>`<svg width="${px(W)}" height="${px(H)}" style="margin-left:0"><path d="${p}" fill="${c}"/></svg>`;
+  const C=k=>getComputedStyle(document.documentElement).getPropertyValue(k).trim();
+  document.getElementById('elbowU').innerHTML=svg(pBL,C('--salmon'));   // upper frame exits via salmon elbow
+  document.getElementById('elbowL').innerHTML=svg(pTL,C('--peach'));    // lower frame enters via peach elbow
+  document.getElementById('elbowB').innerHTML=svg(pBL,C('--peach'));    // and closes at the console bar
+  // divider tube: same segment widths/colors top & bottom (V4-confirmed technique), offset past the elbow arm
+  const segs=[['--orange',2],['--lilac',14],['--gold',3],['--salmon',16],['--peri',7]];
+  const rowHtml=()=>`<div class="dvrow" style="margin-left:${px(W)+px(0.18)}px">`+
+    segs.map(([c,w])=>`<div class="s" style="width:${px(w)}px;background:${C(c)}"></div>`).join('')+`</div>`;
+  document.getElementById('divider').innerHTML=rowHtml()+rowHtml();
+  // live stardate/clock
+  const tick=()=>{const d=new Date(),p=n=>String(n).padStart(2,'0');
+    document.getElementById('clock').textContent=p(d.getMonth()+1)+p(d.getDate())+d.getFullYear()+':'+p(d.getHours())+p(d.getMinutes())};
+  tick();setInterval(tick,1000);
+</script>
+</body>
+</html>

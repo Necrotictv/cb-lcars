@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LaForge Sketch C — Hybrid Console (TNG frame · dense interior)</title>
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ============================================================
+     SKETCH C — "HYBRID CONSOLE"
+     TNG silhouette, Voyager guts:
+     - ONE chunky frame (left spine + swept elbow + header band)
+       so the iconic LCARS shape reads instantly, with STATION nav
+       integrated INTO the spine (buttons connected to the frame).
+     - Interior = lcarsladlondon-style dense instrument clusters
+       (thin outlines, data readouts) so the screen actually WORKS.
+     - Header carries systems row + identity + collapse.
+     ============================================================ */
+  :root{
+    --u:20px;
+    /* UI_STANDARDS palette (meaning-coded) */
+    --tangerine:#f2935b;--lilac:#cba0d4;--canary:#f3f08b;--chetwode:#6e7fc4;
+    --indian:#cc6666;--magenta:#e64de6;--ebony:#20232c;
+    --slate:#9ba7c4;--slate-d:#39415e;--slate-dd:#232838;
+    --bg:#000;--text:#d8c7ec;
+    --fs-title:calc(var(--u)*2.4);--fs-sub:calc(var(--u)*0.55);--fs-data:calc(var(--u)*0.40);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+    font-family:'Antonio',sans-serif;letter-spacing:.06em;overflow:hidden}
+  @keyframes breathe{0%,100%{opacity:1}50%{opacity:.18}}
+  @keyframes breatheSoft{0%,100%{opacity:1}50%{opacity:.5}}
+  .scr{position:relative;height:100vh}
+  svg{display:block}
+
+  /* ---- frame: swept elbow (locked path), spine, header strip ---- */
+  .spine{position:absolute;left:0;background:var(--lilac)}
+  .hstrip{position:absolute;display:flex;gap:calc(var(--u)*0.18)}
+  .hstrip .seg{height:100%}
+  .hstrip .segR{border-radius:0 calc(var(--u)*0.45) calc(var(--u)*0.45) 0}
+
+  /* ---- station nav INSIDE the spine: buttons connected to the frame ---- */
+  .spinenav{position:absolute;display:flex;flex-direction:column;gap:calc(var(--u)*0.35)}
+  .snb{height:calc(var(--u)*1.8);display:flex;align-items:center;justify-content:flex-end;
+    padding-right:calc(var(--u)*0.45);color:#000;font-size:var(--fs-sub);font-weight:500;
+    text-transform:uppercase;cursor:pointer;border-radius:0 calc(var(--u)*0.9) calc(var(--u)*0.9) 0;
+    background:var(--lilac)}
+  .snb.on{background:var(--tangerine)}
+  .snb:not(.on){animation:breatheSoft 4s ease-in-out infinite}
+  .spinenav .snb:nth-child(2){animation-delay:.7s}.spinenav .snb:nth-child(3){animation-delay:1.3s}
+  .spinenav .snb:nth-child(4){animation-delay:2.1s}
+
+  /* ---- header contents: systems row + identity + collapse ---- */
+  .sysrow{position:absolute;display:flex;gap:calc(var(--u)*0.3)}
+  .sys{height:calc(var(--u)*1.3);min-width:calc(var(--u)*5.6);border-radius:calc(var(--u)*0.65);
+    display:flex;align-items:center;justify-content:center;color:#000;font-size:var(--fs-sub);
+    font-weight:500;text-transform:uppercase;cursor:pointer;background:var(--slate-d);color:var(--slate)}
+  .sys.on{background:var(--canary);color:#000;font-weight:600}
+  .ident{position:absolute;text-align:right}
+  .id-sta{font-size:var(--fs-data);color:var(--tangerine);letter-spacing:.2em;text-transform:uppercase}
+  .id-sys{font-size:var(--fs-title);font-weight:700;color:var(--tangerine);line-height:.95;text-transform:uppercase}
+  .id-clk{font-size:var(--fs-data);color:var(--canary);letter-spacing:.13em}
+  .id-clk b{color:var(--text);font-weight:500}
+  .collapse{position:absolute;height:calc(var(--u)*0.95);padding:0 calc(var(--u)*0.7);
+    border-radius:calc(var(--u)*0.5);background:var(--indian);color:#000;font-size:var(--fs-data);
+    display:flex;align-items:center;font-weight:600;cursor:pointer}
+
+  /* ---- dense interior (sketch-B language) ---- */
+  .grid{position:absolute;display:grid;gap:calc(var(--u)*0.35);
+    grid-template-columns:1.15fr 1fr .95fr;grid-template-rows:1fr .95fr;
+    grid-template-areas:"dim wave data" "dim tbl data"}
+  .ins{border:1px solid var(--slate-d);border-radius:calc(var(--u)*0.25);position:relative;
+    padding:calc(var(--u)*0.9) calc(var(--u)*0.5) calc(var(--u)*0.5);min-height:0;overflow:hidden}
+  .ins>.tag{position:absolute;top:0;left:calc(var(--u)*0.5);transform:translateY(-1px);
+    background:var(--slate-d);color:var(--slate);font-size:var(--fs-data);letter-spacing:.16em;
+    padding:calc(var(--u)*0.06) calc(var(--u)*0.4);border-radius:0 0 calc(var(--u)*0.2) calc(var(--u)*0.2);
+    text-transform:uppercase}
+  /* category color chip on each panel tag — meaning-coded per UI_STANDARDS §3 */
+  .ins>.chip{position:absolute;top:calc(var(--u)*0.15);right:calc(var(--u)*0.4);width:calc(var(--u)*1.2);
+    height:calc(var(--u)*0.4);border-radius:calc(var(--u)*0.2)}
+
+  .sliders{display:flex;height:100%;gap:calc(var(--u)*0.7);align-items:stretch;justify-content:center}
+  .sl{display:flex;flex-direction:column;align-items:center;gap:calc(var(--u)*0.25);flex:0 1 calc(var(--u)*2.4)}
+  .sl .track{flex:1;width:100%;border:1px solid var(--slate-d);border-radius:calc(var(--u)*0.2);
+    position:relative;background:repeating-linear-gradient(to top,transparent 0,transparent 7px,var(--slate-dd) 7px,var(--slate-dd) 8px)}
+  .sl .fill{position:absolute;left:2px;right:2px;bottom:2px;background:var(--canary);opacity:.55;border-radius:2px}
+  .sl .handle{position:absolute;left:-2px;right:-2px;height:6px;background:var(--tangerine);border-radius:2px}
+  .sl .lab{font-size:var(--fs-data);color:var(--slate);text-transform:uppercase}
+  .sl .val{font-size:calc(var(--u)*0.7);color:var(--tangerine)}
+
+  .wave{height:100%;display:flex;align-items:center}
+  .wavebars{width:100%;height:70%;
+    background:repeating-linear-gradient(to right,var(--chetwode) 0,var(--chetwode) 2px,transparent 2px,transparent 5px);
+    -webkit-mask-image:linear-gradient(to bottom,transparent 0%,#000 18%,#000 32%,transparent 48%,transparent 52%,#000 68%,#000 82%,transparent 100%);
+    mask-image:linear-gradient(to bottom,transparent 0%,#000 18%,#000 32%,transparent 48%,transparent 52%,#000 68%,#000 82%,transparent 100%);
+    animation:breatheSoft 6s ease-in-out infinite}
+
+  .rows{display:flex;flex-direction:column;gap:calc(var(--u)*0.18);height:100%;justify-content:center}
+  .r{display:flex;gap:calc(var(--u)*0.15);align-items:center;font-size:var(--fs-data)}
+  .r .k{width:calc(var(--u)*4);background:var(--slate-dd);color:var(--slate);
+    padding:calc(var(--u)*0.14) calc(var(--u)*0.3);text-transform:uppercase}
+  .r .bar{flex:1;height:calc(var(--u)*0.55);background:var(--slate-dd);position:relative}
+  .r .bar i{position:absolute;left:0;top:0;bottom:0;background:var(--slate)}
+  .r .v{width:calc(var(--u)*3);text-align:right;color:var(--tangerine)}
+  .r.warn .v{color:var(--indian)} .r.warn .bar i{background:var(--indian)}
+
+  .numstack{display:flex;flex-direction:column;height:100%;justify-content:space-between;
+    font-size:var(--fs-data);line-height:1.65;text-align:right;color:var(--slate);letter-spacing:.14em}
+  .numstack .hi{color:var(--tangerine)} .numstack .hi2{color:#fff}
+
+  /* footer strip */
+  .fstrip{position:absolute;display:flex;gap:calc(var(--u)*0.18);align-items:stretch;font-size:var(--fs-data)}
+  .fstrip .seg{background:var(--slate-dd);color:var(--slate);display:flex;align-items:center;
+    padding:0 calc(var(--u)*0.5);text-transform:uppercase;white-space:nowrap}
+  .fstrip .seg.o{color:var(--tangerine)}
+  .fstrip .fill{flex:1;background:var(--slate-dd)}
+  .fstrip .capR{width:calc(var(--u)*0.7);background:var(--slate-d);border-radius:0 calc(var(--u)*0.45) calc(var(--u)*0.45) 0}
+</style>
+</head>
+<body>
+<div class="scr" id="scr"></div>
+
+<script>
+  /* Frame geometry — LOCKED elbow path (UI_STANDARDS §7), bracket proportions.
+     Spine 1.6u wide (thick) → header 1.4u (thin-ish) via the swept elbow: thick→thin rule holds. */
+  const U=20, px=n=>n*U;
+  const Sw=1.6, Th=1.4, Ro=2.0, Ri=1.0, Eb=3.4, Sp=0.18;
+  const C=k=>getComputedStyle(document.documentElement).getPropertyValue(k).trim();
+  const pathTL=(w,h,tv,th,ro,ri)=>`M0 ${h} L${tv} ${h} L${tv} ${th+ri} Q${tv} ${th} ${tv+ri} ${th} L${w} ${th} L${w} 0 L${ro} 0 Q0 0 0 ${ro} Z`;
+  const scr=document.getElementById('scr');
+  const el=(cls,css,html='')=>{const d=document.createElement('div');d.className=cls;d.style.cssText=css;d.innerHTML=html;scr.appendChild(d);return d};
+
+  // elbow + spine + header strip
+  el('frame','position:absolute;left:0;top:0',
+    `<svg width="${px(Eb)}" height="${px(Eb)}"><path d="${pathTL(px(Eb),px(Eb),px(Sw),px(Th),px(Ro),px(Ri))}" fill="${C('--lilac')}"/></svg>`);
+  el('spine',`top:${px(Eb)}px;bottom:0;width:${px(Sw)}px`);
+  const hs=el('hstrip',`left:${px(Eb+Sp)}px;right:0;top:0;height:${px(Th)}px`);
+  [['--tangerine',3],['--canary',4],['--indian',14],['--chetwode',7],['--lilac',5,'segR']].forEach(([c,w,extra])=>{
+    const s=document.createElement('div');s.className='seg '+(extra||'');s.style.cssText=`width:${px(w)}px;background:${C(c)}`;hs.appendChild(s)});
+
+  // station nav integrated into the spine (connected buttons: flat left edge = touching the frame)
+  const nav=el('spinenav',`left:${px(Sw)}px;top:${px(Eb+0.4)}px;width:${px(6.4)}px`);
+  ['COMMAND','SECURITY','SCIENCE','ENGR'].forEach((n,i)=>{
+    const b=document.createElement('div');b.className='snb'+(i===0?' on':'');b.textContent=n;nav.appendChild(b)});
+
+  // header: systems row under the strip + identity right + collapse
+  const sys=el('sysrow',`left:${px(Eb+Sp)}px;top:${px(Th+0.35)}px`);
+  ['LIGHTING','CLIMATE','VIDEO','SOUND'].forEach((n,i)=>{
+    const b=document.createElement('div');b.className='sys'+(i===0?' on':'');b.textContent=n;sys.appendChild(b)});
+  el('ident',`top:${px(Th+0.3)}px;right:${px(1)}px`,
+    `<div class="id-sta">COMMAND</div><div class="id-sys">LIGHTING</div>
+     <div class="id-clk">STARDATE <b id="clock">—</b></div>`);
+  el('collapse',`top:${px(0.22)}px;right:${px(1)}px`, '▲ COLLAPSE');
+
+  // dense interior grid (below header block, right of nav column)
+  el('grid',`left:${px(Sw+7.4)}px;top:${px(Th+2.6)}px;right:${px(0.5)}px;bottom:${px(1.5)}px`,`
+    <div class="ins" style="grid-area:dim"><div class="tag">Lighting · Dimmers</div><div class="chip" style="background:var(--canary)"></div>
+      <div class="sliders">
+        <div class="sl"><div class="track"><div class="fill" style="height:72%"></div><div class="handle" style="bottom:72%"></div></div><div class="val">72</div><div class="lab">LIVING</div></div>
+        <div class="sl"><div class="track"><div class="fill" style="height:45%"></div><div class="handle" style="bottom:45%"></div></div><div class="val">45</div><div class="lab">FOYER</div></div>
+        <div class="sl"><div class="track"><div class="fill" style="height:90%"></div><div class="handle" style="bottom:90%"></div></div><div class="val">90</div><div class="lab">KITCHEN</div></div>
+        <div class="sl"><div class="track"><div class="fill" style="height:0%"></div><div class="handle" style="bottom:0%"></div></div><div class="val">OFF</div><div class="lab">BACKYD</div></div>
+      </div></div>
+    <div class="ins" style="grid-area:wave"><div class="tag">Subspace Com Wave</div><div class="chip" style="background:var(--magenta)"></div>
+      <div class="wave"><div class="wavebars"></div></div></div>
+    <div class="ins" style="grid-area:tbl"><div class="tag">Fred Core</div><div class="chip" style="background:var(--chetwode)"></div>
+      <div class="rows">
+        <div class="r"><div class="k">CPU LOAD</div><div class="bar"><i style="width:34%"></i></div><div class="v">34%</div></div>
+        <div class="r"><div class="k">MEMORY</div><div class="bar"><i style="width:61%"></i></div><div class="v">61%</div></div>
+        <div class="r warn"><div class="k">ALARMS</div><div class="bar"><i style="width:8%"></i></div><div class="v">1</div></div>
+      </div></div>
+    <div class="ins" style="grid-area:data"><div class="tag">LCARS</div><div class="chip" style="background:var(--lilac)"></div>
+      <div class="numstack">
+        <div>95 485<br>95 490<br><span class="hi">95 497</span></div>
+        <div>41·354<br>44·5134<br><span class="hi2">80·15 91</span></div>
+        <div>420861-68459<br>78-822932-34</div>
+      </div></div>`);
+
+  // footer strip (right of spine)
+  el('fstrip',`left:${px(Sw+Sp)}px;right:0;bottom:${px(0.3)}px;height:${px(0.9)}px`,`
+    <div class="seg o">CONSOLE · COMMAND</div><div class="seg">SUBSPACE RELAY</div>
+    <div class="fill"></div><div class="seg o">ALL SYSTEMS NOMINAL</div><div class="capR"></div>`);
+
+  // live clock
+  const tick=()=>{const d=new Date(),p=n=>String(n).padStart(2,'0');
+    document.getElementById('clock').textContent=p(d.getMonth()+1)+p(d.getDate())+d.getFullYear()+':'+p(d.getHours())+p(d.getMinutes())};
+  tick();setInterval(tick,1000);
+</script>
+</body>
+</html>
