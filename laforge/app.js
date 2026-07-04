@@ -368,14 +368,29 @@ const SAVER = {
     if (this.active) return; this.active = true;
     const d = document.createElement('div');
     d.id = 'saver';
-    /* FedSign.gif — LOCAL copy (assets/, downloaded from lcars.org.uk with
-       Patrick's approval; their SSL is broken so hotlinking https failed).
-       Text fallback stays: the saver must never show a broken-image icon. */
+    /* Media ladder (best available wins, saver never shows a broken icon):
+       1. assets/ufp_spin.mp4 — Patrick's 3D-render clip (he supplies via
+          yt-dlp; see PROJECT_MEMORY). 2. assets/FedSign.gif (local, approved
+          download). 3. text fallback. Muted autoplay is allowed by Chrome. */
     d.innerHTML = `
-      <img src="assets/FedSign.gif" alt=""
-        onerror="this.remove();document.getElementById('saver-fallback').style.display='block'">
       <div id="saver-fallback" style="display:none" class="saver-fb">UNITED FEDERATION OF PLANETS</div>
       <div class="saver-clk" id="saver-clk"></div>`;
+    /* preflight with HEAD requests — <video> error events are unreliable on
+       404s (python http.server leaves it stuck in NETWORK_LOADING forever) */
+    (async () => {
+      const exists = async url => {
+        try { return (await fetch(url, { method:'HEAD' })).ok; } catch { return false; }
+      };
+      if (await exists('assets/ufp_spin.mp4')) {
+        const vid = document.createElement('video');
+        Object.assign(vid, { src:'assets/ufp_spin.mp4', autoplay:true, muted:true, loop:true, playsInline:true });
+        d.prepend(vid);
+      } else if (await exists('assets/FedSign.gif')) {
+        const img = new Image(); img.src = 'assets/FedSign.gif'; d.prepend(img);
+      } else {
+        document.getElementById('saver-fallback').style.display = 'block';
+      }
+    })();
     document.body.appendChild(d);
     d.animate([{opacity:0},{opacity:1}], {duration:1500, fill:'forwards'});
     const t = () => { const dt = new Date(), p = n => String(n).padStart(2,'0');
