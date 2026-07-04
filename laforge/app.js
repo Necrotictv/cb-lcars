@@ -368,10 +368,11 @@ const SAVER = {
     if (this.active) return; this.active = true;
     const d = document.createElement('div');
     d.id = 'saver';
-    /* FedSign.gif (lcars.org.uk, catalogued asset) with a text fallback if
-       the CDN ever dies — the saver must never render a broken-image icon */
+    /* FedSign.gif — LOCAL copy (assets/, downloaded from lcars.org.uk with
+       Patrick's approval; their SSL is broken so hotlinking https failed).
+       Text fallback stays: the saver must never show a broken-image icon. */
     d.innerHTML = `
-      <img src="https://www.lcars.org.uk/ano%20gifs/FedSign.gif" alt=""
+      <img src="assets/FedSign.gif" alt=""
         onerror="this.remove();document.getElementById('saver-fallback').style.display='block'">
       <div id="saver-fallback" style="display:none" class="saver-fb">UNITED FEDERATION OF PLANETS</div>
       <div class="saver-clk" id="saver-clk"></div>`;
