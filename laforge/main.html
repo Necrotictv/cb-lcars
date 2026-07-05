@@ -6,7 +6,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Antonio:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
   /* Chrome/geometry comes from lcars.js + app.js. This CSS styles only content
-     INSIDE panels (canon "type spacing" exception). Press G for grid overlay. */
+     INSIDE panels (canon "type spacing" exception). Dev keys: G grid, S saver, B boot. */
   html,body{margin:0;height:100%;background:#000;overflow:hidden}
   #screen{width:100vw;height:100vh}
 
@@ -56,6 +56,16 @@
   #boot-l1{font-size:calc(var(--u)*0.95);font-weight:600}
   #boot-l2{font-size:calc(var(--u)*0.95);font-weight:600;margin-top:.25em}
 
+  /* alert-condition overlay: pulsing vignette, pointer-transparent.
+     ~1.4s pulse — the TNG klaxon cadence, deliberately NOT synced to
+     any other animation (§8: no unison loops) */
+  #alert-overlay{position:fixed;inset:0;pointer-events:none;z-index:9000}
+  #alert-overlay.alert-red{box-shadow:inset 0 0 calc(var(--u)*7) rgba(255,34,0,.55);
+    animation:alertpulse 1.4s ease-in-out infinite}
+  #alert-overlay.alert-yellow{box-shadow:inset 0 0 calc(var(--u)*6) rgba(255,204,51,.4);
+    animation:alertpulse 2.2s ease-in-out infinite}
+  @keyframes alertpulse{0%,100%{opacity:1}50%{opacity:.25}}
+
   /* screensaver: dim to black, spinning Federation seal, small clock */
   #saver{position:fixed;inset:0;background:#000;z-index:9998;display:flex;
     flex-direction:column;align-items:center;justify-content:center;gap:calc(var(--u)*1);cursor:pointer}
@@ -79,9 +89,9 @@
 <!-- config.local.js is GITIGNORED (HA token); absent = simulated mode.
      ?v= version query = cache-bust (bump when shipping to the kiosk/Fred) -->
 <script src="config.local.js" onerror="console.warn('[LaForge] no local config — simulated mode')"></script>
-<script src="lcars.js?v=2"></script>
-<script src="floorplan.js?v=2"></script>
-<script src="ha.js?v=2"></script>
-<script src="app.js?v=2"></script>
+<script src="lcars.js?v=3"></script>
+<script src="floorplan.js?v=3"></script>
+<script src="ha.js?v=3"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>

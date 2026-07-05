@@ -20,12 +20,13 @@ const HA = (() => {
   const cfg = window.LAFORGE_CONFIG ?? null;
   let hooks = {};
 
-  /* app calls init(DATA, onUpdate(fullRender), onStatus(connected)) once */
-  function init(data, onUpdate, onStatus) {
-    hooks = { data, onUpdate, onStatus };
+  /* app calls init(DATA, onUpdate(fullRender), onStatus(connected), onAlert(mode)) once */
+  function init(data, onUpdate, onStatus, onAlert) {
+    hooks = { data, onUpdate, onStatus, onAlert };
     if (cfg?.token) connect();
     else console.warn('[HA] no config.local.js — mock data mode');
   }
+  let prevAlert = null;
 
   function connect() {
     ws = new WebSocket(cfg.haUrl.replace(/^http/, 'ws') + '/api/websocket');
@@ -93,6 +94,7 @@ const HA = (() => {
     if (flood) { D.dimmers[3][1] = flood.state === 'on' ? 100 : 0; D.floodOn = flood.state === 'on'; }
 
     D.alert = st('input_select.lcards_alert_mode')?.state ?? D.alert;
+    if (D.alert !== prevAlert) { prevAlert = D.alert; hooks.onAlert?.(D.alert); }
 
     D.media = [
       ['DOWNSTAIRS',  st('media_player.downstairs')?.state ?? 'unknown',        num('number.downstairs_volume', 6)],

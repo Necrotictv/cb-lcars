@@ -667,6 +667,28 @@ function patchLive() {
   if (m) { m.style.width = DATA.core.mem + '%'; document.getElementById('mem-n').textContent = DATA.core.memLabel ?? Math.round(DATA.core.mem); }
 }
 
+/* ---- ALERT CONDITION visuals: the whole terminal answers the klaxon ----
+   Red/yellow = temporary SYSTEM palette (never saved) + pulsing vignette.
+   Stand-down restores the user's chosen palette. Driven LIVE from
+   input_select.lcards_alert_mode — any dashboard, automation, or siren
+   that changes it changes THIS terminal too. */
+let shownAlert = 'green_alert';
+function applyAlert(mode) {
+  if (mode === shownAlert) return;
+  shownAlert = mode;
+  document.getElementById('alert-overlay')?.remove();
+  if (mode === 'red_alert' || mode === 'yellow_alert') {
+    LCARS.setPalette(mode === 'red_alert' ? 'redalert' : 'yellowalert');
+    const o = document.createElement('div');
+    o.id = 'alert-overlay';
+    o.className = mode === 'red_alert' ? 'alert-red' : 'alert-yellow';
+    document.body.appendChild(o);
+  } else {
+    LCARS.setPalette(LCARS.settings.get('palette', 'tng'));   // stand down → user's palette
+  }
+  setTimeout(render, Math.max(0, bootUntil - performance.now()));
+}
+
 /* ---- HA hookup: full render once live data lands (after boot finishes),
    targeted patches for every state_changed after that ---- */
 HA.init(DATA,
@@ -676,7 +698,8 @@ HA.init(DATA,
   },
   () => {                                       // connection status flip → re-render chrome
     if (performance.now() > bootUntil) render();
-  });
+  },
+  applyAlert);
 
 render();
 addEventListener('resize', () => render());

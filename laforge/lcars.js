@@ -35,6 +35,13 @@ const LCARS = (() => {
            salmon:'#bb5544', canary:'#ddcc77', magenta:'#aa6688', orange:'#ff9900' },
     voy: { peach:'#ffb380', lilac:'#b0a0dd', peri:'#7f96d4', gold:'#e6c97a',
            salmon:'#c76b6b', canary:'#e8e08a', magenta:'#b05fa0', orange:'#ffaa33' },
+    /* SYSTEM palettes — alert conditions hue-shift the whole terminal
+       (the LCARdS trick, done natively). Not shown in the SYSTEMS picker;
+       applied temporarily, never saved to settings. */
+    redalert:    { peach:'#ff5533', lilac:'#cc6666', peri:'#aa4444', gold:'#ff8855',
+                   salmon:'#f22200', canary:'#ff8866', magenta:'#cc4455', orange:'#ff6644' },
+    yellowalert: { peach:'#ffbb55', lilac:'#ddaa66', peri:'#bb9944', gold:'#ffcc33',
+                   salmon:'#dd8844', canary:'#ffdd55', magenta:'#cc9955', orange:'#ffaa22' },
   };
   const COLORS = {
     ...PALETTES.tng,
