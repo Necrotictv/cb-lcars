@@ -349,7 +349,36 @@ adding real devices (TP-Link/Tuya) + the floor plan himself later tonight.
   hard-reload (ctrl+shift+r) or the page runs STALE code (symptom: new palette/feature
   silently missing, setPalette falls back to tng). Version the script tags before
   kiosk deployment.
-- **NEXT SESSION:** wire local-view pills (LIGHTS INTERIOR/EXTERIOR/SCENES, SECURITY
+- **PHASE 2 LIVE (commit 683f791): the terminal talks to Jarvis.** `laforge/ha.js` =
+  websocket client (long-lived token via GITIGNORED `laforge/config.local.js` — token
+  from _system/credentials/secrets.yaml, exp 2036). One-way flow: states → sync() →
+  DATA → views. Full render deferred past boot sequence (`bootUntil`); state_changed →
+  targeted patchLive. Auto-reconnect 5s. Top bar tri-state: ONLINE/OFFLINE/SIMULATED
+  (no config = mock mode, dev off-LAN works).
+  - LIVE READS: weather.forecast_home (real fog verified), sun times (UTC→local fix
+    required), sensor.fred_* (cpu %, ram MiB→GB — **total ASSUMED 32GiB in ha.js,
+    Patrick verify**), Echo media_player states + volumes, alert mode, flood state.
+  - LIVE CONTROLS (wired, NOT test-fired — Patrick taps first): BACKYARD FLOOD →
+    light.toggle; ALERTS view → input_select.lcards_alert_mode (red/yellow/green).
+    Service path PROVEN via harmless no-op (set alert to current value → success).
+  - Entity gotchas: fred_ram_used is MiB not %; fred_alarms state is 'ok' not '0';
+    sun sensors are UTC ISO timestamps.
+- **ALERT VISUALS (commit f446761) — the "anticlimactic red alert" fix:** Patrick's
+  red-alert tap DID work (state changed in HA); the terminal just had no visualization.
+  Now: `redalert`/`yellowalert` SYSTEM palettes (hue-shift everything, never persisted)
+  + pulsing vignette (1.4s klaxon cadence). ha.js onAlert hook → ANY alert-mode change
+  (button/automation/siren) recolors the terminal live. Full loop verified both ways
+  (RED via state → visuals; STAND DOWN via UI button → green + palette restore).
+  Flood light confirmed REALLY toggled by his tap (was ON: 4/5 lights, BACKYD 100).
+  ⚠️ FILE-WRITE RULE (cost a rebuild): NEVER mix sandbox-mount bash writes (sed -i)
+  with file-tool writes on the same file — main.html got truncated mid-line by the
+  race. One write path per file, always. Scripts now ?v=3.
+- **NEXT SESSION:** remaining reads (cameras last-activity, litter robot, updates,
+  network sensors) → camera live feeds (camera_proxy/stream) → MSD room popups →
+  serving-origin decision + Fred deploy → RED ALERT filming session for the channel →
+  wire remaining reads (cameras last-activity, litter robot, updates, network sensors)
+  → camera live feeds (camera_proxy/stream) → MSD room popups → serving-origin decision
+  + Fred deploy. (Superseded: local-view pills — DONE v0.4.)
   CAMERAS/PERIMETER/ALERTS per spoke map) → remaining workspaces → Phase 2 HA wiring →
   floor plan SVG integration when Patrick's Sweet Home 3D export arrives → Lit port.
   Patrick still to supply: assets/ufp_spin.mp4 (yt-dlp one-liner given). Stretch queue:

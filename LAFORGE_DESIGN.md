@@ -120,6 +120,35 @@ LOCAL VIEWS (its top pill row). Format: **VIEW — features (entities today → 
 - **NETWORK** — WAN status/IP/speeds (arris sensors) → ntopng top-talkers later
 - **UPDATES** — HA core/addon/HACS update entities + backup status
 
+### SCIENCE PAGE DESIGN (2026-07-04 — Patrick: "embedded is the focus")
+PROPOSAL: CLIMATE spoke grows into **SCIENCE** (lilac). Weather becomes one view.
+Hard rule: everything renders IN the UI — no new tabs, ever.
+
+**Embed strategy, three tiers (prefer lower number):**
+1. **NATIVE** (our renderer, perfect LCARS): ORBITAL solar-system map — planet
+   positions computed locally (JPL approximate Keplerian elements, arcminute-class),
+   drawn top-down in palette colors (the intro2 "orbital scan" made real).
+   MOON phase — computed (synodic epoch math) + SVG terminator shading,
+   illumination %, next full/new.
+2. **JS LIBRARY** (integrated, chromeless, stylable): GEO earth view — Leaflet +
+   Esri World Imagery (free, dark, light on kiosk). Upgrade path: CesiumJS 3D globe
+   (true Google-Earth feel, WebGL-heavy — decide after kiosk perf test).
+3. **SANCTIONED IFRAME** (dark-themed + LCARS bezel): SURVEY — Windy official embed
+   (embed.windy.com, radar/wind/temp overlays). Alt/extra: NASA Eyes on the Solar
+   System iframe as a live ORBITAL alternative.
+   Iframes get the "viewscreen" treatment: LCARS header bar + thin inset bezel —
+   framed like a sensor feed, not a webpage.
+
+**Views (4 pills):**
+- **ATMOS** — current conditions + 5-day (live HA weather) — existing CURRENT+FORECAST merged
+- **SURVEY** — Windy embed full-panel + HA readout column (humidity/wind/pressure)
+- **ORBITAL** — native solar system map (left ⅔) + moon phase panel + planet readout (right ⅓)
+- **GEO** — satellite earth full-panel + data column (lat/lon target, ISS position via
+  wheretheiss.at open API — stretch)
+Mock: `laforge/science_mock.html` (real embeds inside the real frame).
+OPEN QUESTIONS for Patrick: rename CLIMATE→SCIENCE? Leaflet-first vs Cesium-3D-first?
+native ORBITAL vs NASA Eyes iframe?
+
 ### Future spokes (post-v1, layout decision needed — 7th cluster changes the 3×2 grid)
 - **ASTROMETRICS** (chetwode?) — star maps / solar system embeds, flight radar, traffic cams
 - SYSTEMS is NOT a spoke — it's terminal chrome (rail button), config only.

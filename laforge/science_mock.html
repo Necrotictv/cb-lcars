@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LaForge — SCIENCE mock (embedded instruments)</title>
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  /* SCIENCE PAGE MOCKUP — proves the embed strategy inside the real frame.
+     Tier 1: native orbital map + moon (our SVG, computed positions)
+     Tier 2: Leaflet + Esri satellite (JS lib, chromeless)
+     Tier 3: Windy official embed (iframe with the LCARS "viewscreen" bezel) */
+  html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:Antonio}
+  #screen{width:100vw;height:100vh}
+  .clb{padding:calc(var(--u)*0.4);font-size:calc(var(--u)*0.40);line-height:1.9;
+    color:#d8c7ec;letter-spacing:.08em;text-transform:uppercase;height:100%;box-sizing:border-box}
+  .clb .v{color:var(--c-orange,#ff9c00)}
+  /* the "viewscreen" treatment: embeds get a thin bezel inset in the panel so
+     they read as sensor feeds, not webpages */
+  .feed{position:absolute;inset:calc(var(--u)*0.25);border:1px solid var(--c-peri,#9999cc);
+    border-radius:4px;overflow:hidden;background:#0a0c12}
+  .feed iframe,.feed .lmap{position:absolute;inset:0;width:100%;height:100%;border:0}
+  .leaflet-control-attribution{background:rgba(0,0,0,.6)!important;color:#667!important;font-size:9px!important}
+  .leaflet-control-zoom a{background:#20232c!important;color:#d8c7ec!important;border-color:#39415e!important}
+</style>
+</head>
+<body>
+<div id="screen"></div>
+<script src="lcars.js?v=3"></script>
+<script>
+'use strict';
+/* ---- standalone mock: subscreen frame + 4 switchable science views ---- */
+const root = document.getElementById('screen');
+const { GAP } = LCARS;
+const RAIL = 6, BARH = 1.0, RO = 2, RI = 1, EW = 7.5, EH = 3.5, DTH = 0.5, DEH = 2.75;
+const VIEWS = ['ATMOS', 'SURVEY', 'ORBITAL', 'GEO'];
+let view = 2;   // open on ORBITAL — the native showpiece
+
+function render() {
+  root.innerHTML = '';
+  const u = root.clientWidth / 50;
+  document.documentElement.style.setProperty('--u', u + 'px');
+  const scr = LCARS.screen(root, { u });
+  const W = 50, H = Math.floor(scr.uh * 4) / 4;
+
+  /* frame (subscreen pattern: two frames + divider, science lilac) */
+  scr.elbow(0, 0, { corner:'tl', tv:RAIL, th:BARH, ro:RO, ri:RI, w:EW, h:EH, color:'lilac' });
+  scr.bar(EW, 0, 2, BARH, 'gold', { left:true });
+  scr.bar(EW + 2, 0, W - EW - 2 - 16 - 1.5, BARH, 'lilac', { left:true });
+  scr.text(W - 17.5, 0, 15.5, BARH, 'U.S.S. JARVIS · SCIENCE STATION', { fs:'sub', color:'orange', align:'right', weight:600 });
+  scr.shape(W - 1.5, 0, 1.5, BARH, { capRight:true, color:'peri' });
+  scr.bar(0, EH, RAIL, 1.75, 'lilac', { top:true });
+  const dy = 5.25;
+  scr.elbow(0, dy, { corner:'bl', tv:RAIL, th:DTH, ro:RO, ri:RI, w:EW, h:DEH, color:'lilac' });
+  const dy2 = dy + DEH + 0.25;
+  scr.elbow(0, dy2, { corner:'tl', tv:RAIL, th:DTH, ro:RO, ri:RI, w:EW, h:DEH, color:'peach' });
+  scr.bar(0, dy2 + DEH, RAIL, 2.5, 'peri', { top:true });
+  scr.text(0, dy2 + DEH + 1.75, RAIL - 0.25, 0.75, 'SENSORS', { fs:'data', color:'black', align:'right', weight:600 });
+  scr.bar(0, dy2 + DEH + 2.5, RAIL, (H - EH) - (dy2 + DEH + 2.5), 'peach', { top:true, bottom:true });
+  scr.elbow(0, H - EH, { corner:'bl', tv:RAIL, th:BARH, ro:RO, ri:RI, w:EW, h:EH, color:'peach' });
+  scr.text(EW + 0.25, H - BARH, 8, BARH, 'CONSOLE · SCIENCE', { fs:'sub', color:'orange', weight:600 });
+  scr.bar(EW + 8.5, H - BARH, W - EW - 8.5 - 1.5, BARH, 'lilac', { left:true });
+  scr.shape(W - 1.5, H - BARH, 1.5, BARH, { capRight:true, color:'peri' });
+  for (const yy of [dy + DEH - DTH, dy2]) {
+    let sx = EW;
+    for (const [c, w] of [['lilac', 2], ['peri', 12], ['gold', 3], ['salmon', 14], ['lilac', null]]) {
+      const sw = w ?? (W - GAP - sx); if (sw <= 0) break;
+      if (w === null) scr.shape(sx, yy, sw, DTH, { capRight:true, color:c });
+      else scr.bar(sx, yy, sw, DTH, c, { left:true });
+      sx += sw;
+    }
+  }
+
+  /* nav: MAIN + view pills + identity */
+  const cx0 = RAIL + GAP, cx1 = W - GAP;
+  scr.button(cx0, BARH + 0.5, 4, 'MAIN', { color:'#d8c7ec', on:true, ends:'pill' });
+  VIEWS.forEach((v, i) => {
+    const b = scr.button(cx0 + 4.5 + i * 6, BARH + 0.5, 5.5, v, { color: i === view ? 'lilac' : 'peri', on: i === view, ends:'pill' });
+    if (i !== view) { scr.breathe(b, { soft:true }); scr.onTap(b, () => { view = i; render(); }); }
+  });
+  scr.text(cx1 - 18, BARH + 2, 18, 0.5, 'SCIENCE STATION', { fs:'data', color:'orange', align:'right', ls:'.2em' });
+  scr.text(cx1 - 18, BARH + 2.5, 18, 2.5, VIEWS[view], { fs:'title', color:'orange', align:'right', weight:700 });
+
+  /* workspace */
+  const y0 = dy2 + DTH + GAP, y1 = H - BARH - GAP;
+  [renderAtmos, renderSurvey, renderOrbital, renderGeo][view](scr, cx0, y0, cx1, y1);
+}
+
+const head = (scr, x, y, w, color, title) => {
+  scr.shape(x, y, w, 1.1, { capRight:true, color });
+  scr.text(x + 0.5, y, w - 1, 1.1, title, { fs:'sub', color:'black', weight:600 });
+};
+
+/* ---------- ATMOS (existing pattern placeholder) ---------- */
+function renderAtmos(scr, x0, y0, x1, y1) {
+  head(scr, x0, y0, x1 - x0, 'lilac', 'ATMOSPHERIC · LIVE HA WEATHER (EXISTING VIEWS MERGE HERE)');
+  scr.panel(x0, y0 + 1.35, x1 - x0, y1 - y0 - 1.35).innerHTML =
+    `<div class="clb">CURRENT + 5-DAY FORECAST — already built, merges into this view.</div>`;
+}
+
+/* ---------- SURVEY: Windy official embed with viewscreen bezel ---------- */
+function renderSurvey(scr, x0, y0, x1, y1) {
+  const wMap = Math.floor((x1 - x0) * 0.75 * 4) / 4;
+  head(scr, x0, y0, wMap, 'lilac', 'PLANETARY SURVEY · WINDY UPLINK');
+  const p = scr.panel(x0, y0 + 1.35, wMap, y1 - y0 - 1.35);
+  p.innerHTML = `<div class="feed"><iframe
+    src="https://embed.windy.com/embed2.html?lat=39.1&lon=-84.5&detailLat=39.1&detailLon=-84.5&width=650&height=450&zoom=8&level=surface&overlay=radar&product=radar&menu=&message=&marker=&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=mph&metricTemp=%C2%B0F&radarRange=-1"
+    loading="lazy"></iframe></div>`;
+  const dx = x0 + wMap + GAP;
+  head(scr, dx, y0, x1 - dx, 'peri', 'READOUT');
+  scr.panel(dx, y0 + 1.35, x1 - dx, y1 - y0 - 1.35).innerHTML =
+    `<div class="clb">OVERLAY <span class="v">RADAR</span><br>HUMIDITY <span class="v">63%</span><br>
+     WIND <span class="v">4 MPH</span><br>PRESSURE <span class="v">29.98 IN</span><br><br>
+     (LIVE HA DATA HERE)</div>`;
+}
+
+/* ---------- ORBITAL: NATIVE solar system + moon phase (tier 1) ---------- */
+/* Planet positions: JPL approximate Keplerian elements (J2000 + centennial
+   rates). Heliocentric longitude via Kepler's equation — display-accurate. */
+const PLANETS = [
+  // name, a(AU), e, L0(deg), Ldot(deg/cy), peri0, peridot, color, r(px)
+  ['MERCURY', 0.387, 0.2056, 252.25, 149472.674, 77.457, 0.160, 'peri',   1.4],
+  ['VENUS',   0.723, 0.0068, 181.98,  58517.816, 131.53, 0.048, 'gold',   2.2],
+  ['EARTH',   1.000, 0.0167, 100.46,  35999.372, 102.94, 0.323, 'peri',   2.3],
+  ['MARS',    1.524, 0.0934,  -4.55,  19140.303, -23.94, 0.444, 'salmon', 1.8],
+  ['JUPITER', 5.203, 0.0484,  34.40,   3034.746,  14.73, 0.213, 'peach',  4.5],
+  ['SATURN',  9.537, 0.0539,  49.95,   1222.494,  92.60, -0.42, 'canary', 4.0],
+];
+function planetAngles() {
+  const T = (Date.now() / 86400000 + 2440587.5 - 2451545.0) / 36525;   // centuries since J2000
+  return PLANETS.map(([name, a, e, L0, Ld, p0, pd, color, r]) => {
+    const L = (L0 + Ld * T) % 360, peri = p0 + pd * T;
+    let M = ((L - peri) % 360 + 360) % 360 * Math.PI / 180;
+    let E = M; for (let i = 0; i < 5; i++) E = M + e * Math.sin(E);     // Kepler iteration
+    const v = 2 * Math.atan2(Math.sqrt(1 + e) * Math.sin(E / 2), Math.sqrt(1 - e) * Math.cos(E / 2));
+    return { name, lon: v + peri * Math.PI / 180, dist: a * (1 - e * Math.cos(E)), color, r };
+  });
+}
+function moonPhase() {
+  const synodic = 29.53058867;
+  const days = (Date.now() - Date.UTC(2000, 0, 6, 18, 14)) / 86400000;
+  const f = ((days % synodic) + synodic) % synodic / synodic;          // 0=new .5=full
+  const illum = Math.round((1 - Math.cos(2 * Math.PI * f)) / 2 * 100);
+  const names = ['NEW', 'WAXING CRESCENT', 'FIRST QUARTER', 'WAXING GIBBOUS', 'FULL',
+                 'WANING GIBBOUS', 'LAST QUARTER', 'WANING CRESCENT'];
+  return { f, illum, name: names[Math.floor((f * 8 + 0.5)) % 8],
+    toFull: ((0.5 - f + 1) % 1) * synodic, toNew: ((1 - f) % 1) * synodic };
+}
+function renderOrbital(scr, x0, y0, x1, y1) {
+  const wMap = Math.floor((x1 - x0) * 0.62 * 4) / 4;
+  head(scr, x0, y0, wMap, 'lilac', 'ORBITAL PLOT · SOL SYSTEM · REAL-TIME');
+  const p = scr.panel(x0, y0 + 1.35, wMap, y1 - y0 - 1.35);
+  const C = k => getComputedStyle(document.documentElement).getPropertyValue('--c-' + k).trim();
+  /* log-ish radial scale so inner + outer planets share one display */
+  const R = d => 28 + 62 * Math.log10(1 + d * 3) / Math.log10(1 + 9.6 * 3);
+  let svg = `<circle cx="150" cy="105" r="6" fill="${C('gold')}"><animate attributeName="opacity" values="1;.6;1" dur="4s" repeatCount="indefinite"/></circle>`;
+  planetAngles().forEach(pl => {
+    const r = R(pl.dist);
+    const px = 150 + r * Math.cos(-pl.lon), py = 105 + r * Math.sin(-pl.lon);
+    svg += `<circle cx="150" cy="105" r="${r}" fill="none" stroke="${C('peri')}" stroke-width="0.4" opacity="0.5"/>
+      <circle cx="${px}" cy="${py}" r="${pl.r}" fill="${C(pl.color)}"/>
+      <text x="${px + 5}" y="${py + 2}" font-size="5.5" fill="${C('lilac')}" font-family="Antonio" letter-spacing="1">${pl.name}</text>`;
+  });
+  p.innerHTML = `<div class="feed" style="border-color:transparent"><svg viewBox="0 0 300 210" style="width:100%;height:100%">${svg}</svg></div>`;
+
+  /* right column: moon phase (computed + drawn) + readout */
+  const dx = x0 + wMap + GAP, m = moonPhase();
+  head(scr, dx, y0, x1 - dx, 'peri', 'LUNA');
+  const mp = scr.panel(dx, y0 + 1.35, x1 - dx, y1 - y0 - 1.35);
+  /* terminator shading: two half-discs + an ellipse whose width follows phase */
+  const ew = Math.abs(Math.cos(2 * Math.PI * m.f)) * 40, waxing = m.f < 0.5;
+  mp.innerHTML = `<div class="clb" style="text-align:center">
+    <svg viewBox="0 0 100 100" style="width:55%;margin-top:4%">
+      <circle cx="50" cy="50" r="40" fill="#1a1d28"/>
+      <path d="M50 10 A40 40 0 0 ${waxing ? 1 : 0} 50 90 Z" fill="#e8e4d8"/>
+      <ellipse cx="50" cy="50" rx="${ew}" ry="40" fill="${(m.f > 0.25 && m.f < 0.75) ? '#e8e4d8' : '#1a1d28'}"/>
+    </svg><br>
+    <span class="v" style="font-size:calc(var(--u)*0.55)">${m.name}</span><br><br>
+    ILLUMINATION <span class="v">${m.illum}%</span><br>
+    FULL MOON <span class="v">${m.toFull.toFixed(1)} DAYS</span><br>
+    NEW MOON <span class="v">${m.toNew.toFixed(1)} DAYS</span></div>`;
+}
+
+/* ---------- GEO: Leaflet + Esri satellite (tier 2 — no iframe) ---------- */
+function renderGeo(scr, x0, y0, x1, y1) {
+  const wMap = Math.floor((x1 - x0) * 0.78 * 4) / 4;
+  head(scr, x0, y0, wMap, 'lilac', 'GEOSPATIAL · SURFACE IMAGING');
+  const p = scr.panel(x0, y0 + 1.35, wMap, y1 - y0 - 1.35);
+  p.innerHTML = `<div class="feed"><div class="lmap" id="lmap"></div></div>`;
+  setTimeout(() => {
+    const map = L.map('lmap', { zoomControl: true, attributionControl: true }).setView([39.1, -84.5], 10);
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      { attribution: 'Esri World Imagery', maxZoom: 18 }).addTo(map);
+  }, 50);
+  const dx = x0 + wMap + GAP;
+  head(scr, dx, y0, x1 - dx, 'peri', 'TARGETING');
+  scr.panel(dx, y0 + 1.35, x1 - dx, y1 - y0 - 1.35).innerHTML =
+    `<div class="clb">TARGET <span class="v">RESIDENCE</span><br>MODE <span class="v">VISUAL</span><br><br>
+     (UPGRADE PATH: CESIUMJS 3D GLOBE — decide after kiosk perf test)</div>`;
+}
+
+render();
+addEventListener('resize', render);
+</script>
+</body>
+</html>
