@@ -145,9 +145,19 @@ Hard rule: everything renders IN the UI — no new tabs, ever.
 - **ORBITAL** — native solar system map (left ⅔) + moon phase panel + planet readout (right ⅓)
 - **GEO** — satellite earth full-panel + data column (lat/lon target, ISS position via
   wheretheiss.at open API — stretch)
-Mock: `laforge/science_mock.html` (real embeds inside the real frame).
-OPEN QUESTIONS for Patrick: rename CLIMATE→SCIENCE? Leaflet-first vs Cesium-3D-first?
-native ORBITAL vs NASA Eyes iframe?
+Mock: `laforge/science_mock.html` (real embeds inside the real frame — all three
+tiers verified live 2026-07-04).
+
+**DECISIONS LOCKED (Patrick, 2026-07-04):**
+1. **CLIMATE → SCIENCE.** One lilac science station; weather = ATMOS view.
+2. **GEO = CesiumJS 3D globe from the start.** Full spinning-earth feel. Use CDN
+   CesiumJS + Esri ArcGIS imagery provider (NO ion token needed). Perf-validate on
+   the kiosk; Leaflet 2D remains the documented fallback if the wall panel chokes.
+3. **ORBITAL = native LCARS render as the main view + NASA Eyes iframe as the
+   DETAIL POPUP** — tap a planet on our map → "viewscreen" popup with JPL's
+   photoreal 3D locked to that body. Best of both: authentic chrome, real science
+   on demand.
+4. Coordinates come from HA `zone.home` (mock used guessed Cincinnati coords).
 
 ### Future spokes (post-v1, layout decision needed — 7th cluster changes the 3×2 grid)
 - **ASTROMETRICS** (chetwode?) — star maps / solar system embeds, flight radar, traffic cams

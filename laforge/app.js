@@ -26,7 +26,7 @@ const DTH = 0.5, DEH = 2.75;   // subscreen divider arm thickness / elbow box he
 const GROUPS = [
   { id:'lights',   label:'LIGHTS',   color:'canary',  badge:'3/5 ON',   local:['ALL','INTERIOR','EXTERIOR','SCENES'] },
   { id:'security', label:'SECURITY', color:'salmon',  badge:'GREEN',    local:['CAMERAS','PERIMETER','ALERTS'] },
-  { id:'climate',  label:'CLIMATE',  color:'lilac',   badge:'71°F',     local:['CURRENT','FORECAST','SURVEY'] },
+  { id:'science',  label:'SCIENCE',  color:'lilac',   badge:'71°F',     local:['ATMOS','SURVEY','ORBITAL','GEO'] },
   { id:'media',    label:'MEDIA',    color:'magenta', badge:'IDLE',     local:['PLAYERS','ANNOUNCE','VOLUME'] },
   { id:'home',     label:'HOME',     color:'peri',    badge:'2 EVENTS', local:['MSD','CALENDAR','ROUTINES'] },
   { id:'core',     label:'CORE',     color:'peach',   badge:'NOMINAL',  local:['FRED','NETWORK','UPDATES'] },
@@ -153,7 +153,7 @@ function renderMain(scr, W, H) {
   /* badges compute from DATA so live values show without code changes */
   const badges = {
     lights: (DATA.floodOn ? '4/5' : '3/5') + ' ON', security: alertLabel(),
-    climate: DATA.climate.temp + '°F', media: 'IDLE',
+    science: DATA.climate.temp + '°F', media: 'IDLE',
     home: '2 EVENTS', core: DATA.core.alarms === '0' ? 'NOMINAL' : 'ALARM',
   };
   GROUPS.forEach((g, i) => {
@@ -188,7 +188,7 @@ function clusterBody(id) {
       <div class="cam" data-n="BACKYARD"><i class="scan"></i></div>
       <div class="cam" data-n="DOWNSTAIRS"><i class="scan"></i></div></div>
       MOTION <span class="v">ARMED</span> · SIRENS <span class="v">STANDBY</span>`;
-    case 'climate': return `CONDITION <span class="v">${DATA.climate.condition}</span><br>HUMIDITY <span class="v">${DATA.climate.humidity}%</span><br>SUNSET <span class="v">${DATA.climate.sunset}</span> · WIND <span class="v">${DATA.climate.wind} MPH</span>`;
+    case 'science': return `CONDITION <span class="v">${DATA.climate.condition}</span><br>HUMIDITY <span class="v">${DATA.climate.humidity}%</span><br>SUNSET <span class="v">${DATA.climate.sunset}</span> · LUNA <span class="v">${moonPhase().illum}%</span>`;
     case 'media': return DATA.media.slice(0, 3).map(([n, s, v]) =>
       `${n} <span class="v">${s === 'playing' ? 'VOL ' + v : s.toUpperCase()}</span>`).join('<br>');
     case 'home': return `14:00 <span class="v">STANDUP</span><br>18:30 <span class="v">FILM SESSION</span><br>LITTER ROBOT <span class="v">CYCLED 12:40</span>`;
@@ -373,6 +373,72 @@ const btns = (scr, panel, items) => {   // items: [color, text, action?] — act
   panel.querySelectorAll('.wbtn').forEach((b, i) => scr.onTap(b, items[i][2] ?? (() => {})));
 };
 
+/* ============================ SCIENCE ENGINE ============================
+   Tier-1 native instruments (LAFORGE_DESIGN embed doctrine). */
+
+/* Planet positions: JPL approximate Keplerian elements (J2000 + rates/century).
+   Kepler's equation solved by fixed-point iteration — display-accurate. */
+const PLANETS = [
+  ['MERCURY', 0.387, 0.2056, 252.25, 149472.674,  77.457,  0.160, 'peri',   1.4],
+  ['VENUS',   0.723, 0.0068, 181.98,  58517.816, 131.53,   0.048, 'gold',   2.2],
+  ['EARTH',   1.000, 0.0167, 100.46,  35999.372, 102.94,   0.323, 'peri',   2.3],
+  ['MARS',    1.524, 0.0934,  -4.55,  19140.303, -23.94,   0.444, 'salmon', 1.8],
+  ['JUPITER', 5.203, 0.0484,  34.40,   3034.746,  14.73,   0.213, 'peach',  4.5],
+  ['SATURN',  9.537, 0.0539,  49.95,   1222.494,  92.60,  -0.420, 'canary', 4.0],
+];
+function planetAngles() {
+  const T = (Date.now() / 86400000 + 2440587.5 - 2451545.0) / 36525;
+  return PLANETS.map(([name, a, e, L0, Ld, p0, pd, color, r]) => {
+    const L = (L0 + Ld * T) % 360, peri = p0 + pd * T;
+    let M = (((L - peri) % 360) + 360) % 360 * Math.PI / 180;
+    let E = M; for (let i = 0; i < 5; i++) E = M + e * Math.sin(E);
+    const v = 2 * Math.atan2(Math.sqrt(1 + e) * Math.sin(E / 2), Math.sqrt(1 - e) * Math.cos(E / 2));
+    return { name, lon: v + peri * Math.PI / 180, dist: a * (1 - e * Math.cos(E)), color, r };
+  });
+}
+/* Moon: synodic epoch math (new moon 2000-01-06 18:14 UTC) */
+function moonPhase() {
+  const syn = 29.53058867;
+  const days = (Date.now() - Date.UTC(2000, 0, 6, 18, 14)) / 86400000;
+  const f = ((days % syn) + syn) % syn / syn;
+  const names = ['NEW', 'WAXING CRESCENT', 'FIRST QUARTER', 'WAXING GIBBOUS', 'FULL',
+                 'WANING GIBBOUS', 'LAST QUARTER', 'WANING CRESCENT'];
+  return { f, illum: Math.round((1 - Math.cos(2 * Math.PI * f)) / 2 * 100),
+    name: names[Math.floor(f * 8 + 0.5) % 8],
+    toFull: ((0.5 - f + 1) % 1) * syn, toNew: ((1 - f) % 1) * syn };
+}
+
+/* lazy CDN loader — Cesium (~10MB) must not load until GEO opens (HD 520 kiosk) */
+const loaded = {};
+function loadScript(src, cssHref) {
+  if (loaded[src]) return loaded[src];
+  if (cssHref) { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = cssHref; document.head.appendChild(l); }
+  loaded[src] = new Promise((res, rej) => {
+    const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+  return loaded[src];
+}
+
+/* viewscreen popup: LCARS bezel + title + CLOSE — reusable (NASA Eyes now,
+   camera feeds later). One at a time; ESC or CLOSE dismisses. */
+function viewscreen(title, contentHTML) {
+  document.getElementById('vpop')?.remove();
+  const v = document.createElement('div');
+  v.id = 'vpop';
+  v.innerHTML = `<div class="vpop-frame">
+    <div class="vpop-bar"><span>${title}</span><div class="vpop-close">▣ CLOSE</div></div>
+    <div class="vpop-body">${contentHTML}</div></div>`;
+  document.body.appendChild(v);
+  v.animate([{opacity:0},{opacity:1}], {duration:180, fill:'forwards'});
+  const close = () => v.remove();
+  v.querySelector('.vpop-close').addEventListener('pointerup', close);
+  v.addEventListener('pointerup', e => { if (e.target === v) close(); });
+  return v;
+}
+
+const homeGeo = () => DATA.geo ?? { lat: 39.1, lon: -84.5 };   // zone.home via ha.js
+
 function renderWorkspace(scr, g, view, x0, y0, x1, y1) {
   const key = g.id + ':' + ((g.local ?? [])[view] ?? '');
   const cols = defs => wsCols(scr, x0, y0, x1, y1, defs);
@@ -434,24 +500,108 @@ function renderWorkspace(scr, g, view, x0, y0, x1, y1) {
         07:14 <span class="v">CONDITION GREEN · AUTO</span></div>`;
       break; }
 
-    /* ---------------- CLIMATE ---------------- */
-    case 'climate:CURRENT': {
-      const [now, sun] = cols([['lilac','ATMOSPHERIC · CURRENT'], ['peri','SOLAR']]);
+    /* ---------------- SCIENCE ---------------- */
+    case 'science:ATMOS': {
+      const [now, fc] = cols([['lilac','ATMOSPHERIC · CURRENT'], ['peri','5-DAY FORECAST']]);
       const c = DATA.climate;
       now.innerHTML = `<div class="clb"><span class="bigval">${c.temp}°F</span><br><br>
         CONDITION <span class="v">${c.condition}</span> · HUMIDITY <span class="v">${c.humidity}%</span><br>
-        WIND <span class="v">${c.wind} MPH</span></div>`;
-      sun.innerHTML = `<div class="clb">SUNRISE <span class="v">${c.sunrise}</span><br>SUNSET <span class="v">${c.sunset}</span><br>
-        MOON <span class="v">WANING GIBBOUS</span></div>`;
-      break; }
-    case 'climate:FORECAST': {
-      const [fc] = cols([['lilac','5-DAY FORECAST']]);
+        WIND <span class="v">${c.wind} MPH</span><br><br>
+        SUNRISE <span class="v">${c.sunrise}</span> · SUNSET <span class="v">${c.sunset}</span></div>`;
+      /* forecast strip: mock until weather.get_forecasts service wired (modern
+         HA moved forecasts out of attributes — service call, Phase 2.1) */
       fc.innerHTML = `<div class="clb" style="display:flex;gap:2%;align-items:stretch">` +
         [['SAT','CLEAR',88,66], ['SUN','P/CLOUDY',84,64], ['MON','STORMS',79,63], ['TUE','CLEAR',82,61], ['WED','CLEAR',85,63]]
-        .map(([d, c, h, l]) => `<div style="flex:1;text-align:center;border:1px solid #39415e;border-radius:4px;padding:4% 0">
-          <span class="v">${d}</span><br><br>${c}<br><br><span class="bigval" style="font-size:calc(var(--u)*1.1)">${h}°</span><br>${l}°</div>`).join('') + `</div>`;
+        .map(([d, cc, h, l]) => `<div style="flex:1;text-align:center;border:1px solid #39415e;border-radius:4px;padding:4% 0">
+          <span class="v">${d}</span><br><br>${cc}<br><br><span class="bigval" style="font-size:calc(var(--u)*1.1)">${h}°</span><br>${l}°</div>`).join('') + `</div>`;
       break; }
-    case 'climate:SURVEY': { workspaceStandby(scr, x0, y0, x1, y1, g, 'PLANETARY SURVEY · AWAITING WINDY UPLINK'); break; }
+
+    case 'science:SURVEY': {
+      const geo = homeGeo();
+      const wMap = Math.floor((x1 - x0) * 0.75 * 4) / 4;
+      const [mapP] = wsCols(scr, x0, y0, x0 + wMap, y1, [['lilac','PLANETARY SURVEY · WINDY UPLINK']]);
+      mapP.innerHTML = `<div class="feed"><iframe src="https://embed.windy.com/embed2.html?lat=${geo.lat}&lon=${geo.lon}&detailLat=${geo.lat}&detailLon=${geo.lon}&zoom=8&level=surface&overlay=radar&product=radar&menu=&message=&marker=&calendar=now&type=map&location=coordinates&metricWind=mph&metricTemp=%C2%B0F&radarRange=-1" loading="lazy"></iframe></div>`;
+      const dx = x0 + wMap + GAP;
+      const [ro] = wsCols(scr, dx, y0, x1, y1, [['peri','READOUT']]);
+      ro.innerHTML = `<div class="clb">OVERLAY <span class="v">RADAR</span><br>
+        HUMIDITY <span class="v">${DATA.climate.humidity}%</span><br>WIND <span class="v">${DATA.climate.wind} MPH</span><br>
+        CONDITION <span class="v">${DATA.climate.condition}</span></div>`;
+      break; }
+
+    case 'science:ORBITAL': {
+      const wMap = Math.floor((x1 - x0) * 0.62 * 4) / 4;
+      const [orb] = wsCols(scr, x0, y0, x0 + wMap, y1, [['lilac','ORBITAL PLOT · SOL SYSTEM · REAL-TIME']]);
+      const C = k => getComputedStyle(document.documentElement).getPropertyValue('--c-' + k).trim();
+      const R = d => 28 + 62 * Math.log10(1 + d * 3) / Math.log10(1 + 9.6 * 3);
+      let svg = `<circle cx="150" cy="105" r="6" fill="${C('gold')}"><animate attributeName="opacity" values="1;.6;1" dur="4s" repeatCount="indefinite"/></circle>`;
+      planetAngles().forEach(pl => {
+        const r = R(pl.dist), px = 150 + r * Math.cos(-pl.lon), py = 105 + r * Math.sin(-pl.lon);
+        svg += `<circle cx="150" cy="105" r="${r}" fill="none" stroke="${C('peri')}" stroke-width="0.4" opacity="0.5"/>
+          <g data-planet="${pl.name}" style="cursor:pointer">
+          <circle cx="${px}" cy="${py}" r="${pl.r + 4}" fill="transparent"/>
+          <circle cx="${px}" cy="${py}" r="${pl.r}" fill="${C(pl.color)}"/>
+          <text x="${px + 5}" y="${py + 2}" font-size="5.5" fill="${C('lilac')}" font-family="Antonio" letter-spacing="1">${pl.name}</text></g>`;
+      });
+      orb.innerHTML = `<div class="feed" style="border-color:transparent"><svg viewBox="0 0 300 210" style="width:100%;height:100%">${svg}</svg></div>`;
+      /* planet tap → NASA Eyes viewscreen popup (the locked design) */
+      orb.querySelectorAll('[data-planet]').forEach(el =>
+        el.addEventListener('pointerup', () => {
+          const n = el.dataset.planet.toLowerCase();
+          viewscreen('VIEWSCREEN · ' + el.dataset.planet + ' · JPL EYES UPLINK',
+            `<iframe src="https://eyes.nasa.gov/apps/solar-system/#/${n}?embed=true&logo=false" loading="lazy" allow="fullscreen"></iframe>`);
+        }));
+      const dx = x0 + wMap + GAP, m = moonPhase();
+      const [luna] = wsCols(scr, dx, y0, x1, y1, [['peri','LUNA']]);
+      const ew = Math.abs(Math.cos(2 * Math.PI * m.f)) * 40, waxing = m.f < 0.5;
+      luna.innerHTML = `<div class="clb" style="text-align:center">
+        <svg viewBox="0 0 100 100" style="width:52%;margin-top:3%">
+          <circle cx="50" cy="50" r="40" fill="#1a1d28"/>
+          <path d="M50 10 A40 40 0 0 ${waxing ? 1 : 0} 50 90 Z" fill="#e8e4d8"/>
+          <ellipse cx="50" cy="50" rx="${ew}" ry="40" fill="${(m.f > 0.25 && m.f < 0.75) ? '#e8e4d8' : '#1a1d28'}"/>
+        </svg><br><span class="v" style="font-size:calc(var(--u)*0.55)">${m.name}</span><br><br>
+        ILLUMINATION <span class="v">${m.illum}%</span><br>
+        FULL MOON <span class="v">${m.toFull.toFixed(1)} DAYS</span><br>
+        NEW MOON <span class="v">${m.toNew.toFixed(1)} DAYS</span></div>`;
+      break; }
+
+    case 'science:GEO': {
+      const geo = homeGeo();
+      const wMap = Math.floor((x1 - x0) * 0.78 * 4) / 4;
+      const [mapP] = wsCols(scr, x0, y0, x0 + wMap, y1, [['lilac','GEOSPATIAL · 3D GLOBE']]);
+      mapP.innerHTML = `<div class="feed"><div id="cesium-host" style="position:absolute;inset:0">
+        <div class="clb" style="text-align:center;padding-top:20%">■ INITIALIZING GLOBE…</div></div></div>`;
+      /* Cesium lazy-load: ~10MB, only when GEO opens. HD 520 kiosk budget:
+         requestRenderMode (render on demand), no ion token (Esri imagery). */
+      loadScript('https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Cesium.js',
+                 'https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Widgets/widgets.css')
+        .then(async () => {
+          const host = document.getElementById('cesium-host');
+          if (!host) return;                      // user navigated away mid-load
+          host.innerHTML = '';
+          const imagery = await Cesium.ArcGisMapServerImageryProvider.fromUrl(
+            'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer');
+          const viewer = new Cesium.Viewer(host, {
+            baseLayer: new Cesium.ImageryLayer(imagery),
+            baseLayerPicker:false, geocoder:false, timeline:false, animation:false,
+            homeButton:false, sceneModePicker:false, navigationHelpButton:false,
+            fullscreenButton:false, infoBox:false, selectionIndicator:false,
+            requestRenderMode:true, maximumRenderTimeChange:Infinity,
+          });
+          viewer.scene.globe.enableLighting = true;     // day/night terminator — very MSD
+          /* requestRenderMode gotcha: async imagery tiles do NOT trigger renders —
+             hook tile progress so the globe paints as tiles land, then stays idle */
+          viewer.scene.globe.tileLoadProgressEvent.addEventListener(() => viewer.scene.requestRender());
+          viewer.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(geo.lon, geo.lat, 15000000) });
+        }).catch(() => {
+          const host = document.getElementById('cesium-host');
+          if (host) host.innerHTML = '<div class="clb" style="text-align:center;padding-top:20%">GLOBE UPLINK FAILED · CDN UNREACHABLE</div>';
+        });
+      const dx = x0 + wMap + GAP;
+      const [tg] = wsCols(scr, dx, y0, x1, y1, [['peri','TARGETING']]);
+      tg.innerHTML = `<div class="clb">TARGET <span class="v">RESIDENCE</span><br>
+        LAT <span class="v">${geo.lat.toFixed(3)}</span><br>LON <span class="v">${geo.lon.toFixed(3)}</span><br>
+        LIGHTING <span class="v">DAY/NIGHT LIVE</span></div>`;
+      break; }
 
     /* ---------------- MEDIA ---------------- */
     case 'media:PLAYERS': {

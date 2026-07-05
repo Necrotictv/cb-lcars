@@ -373,8 +373,22 @@ adding real devices (TP-Link/Tuya) + the floor plan himself later tonight.
   ⚠️ FILE-WRITE RULE (cost a rebuild): NEVER mix sandbox-mount bash writes (sed -i)
   with file-tool writes on the same file — main.html got truncated mid-line by the
   race. One write path per file, always. Scripts now ?v=3.
-- **NEXT SESSION:** remaining reads (cameras last-activity, litter robot, updates,
-  network sensors) → camera live feeds (camera_proxy/stream) → MSD room popups →
+- **SCIENCE PAGE designed + mocked (commit c38f793) — DECISIONS LOCKED:** CLIMATE spoke
+  becomes SCIENCE (lilac): ATMOS (weather, existing) / SURVEY (Windy official embed —
+  verified live) / ORBITAL (NATIVE solar system — JPL Keplerian math real-time +
+  computed moon phase w/ SVG terminator — verified, gorgeous) / GEO (**CesiumJS 3D
+  globe from the start** — CDN + Esri imagery provider, NO ion token; Leaflet 2D is
+  the perf fallback, mock proves it). ORBITAL detail: tap planet → **NASA Eyes iframe
+  popup** (viewscreen treatment). Embed rule: 3 tiers, native > JS lib > sanctioned
+  iframe w/ bezel; NO new tabs ever. Coords from HA zone.home (mock guessed Cincinnati).
+  Mock: laforge/science_mock.html (4 views switchable).
+- **KIOSK HARDWARE (Patrick, 2026-07-04):** Surface Pro 4 — containerized/isolated
+  Win10 OR compatible Linux distro. GPU = Intel HD 520 (Skylake iGPU): CesiumJS-capable
+  at panel res, but budget it — `requestRenderMode:true` (render on demand), resolution
+  scale ≤1, high maximumScreenSpaceError, lazy-load Cesium only when GEO view opens.
+- **NEXT SESSION:** implement SCIENCE spoke for real (rename + 4 views + Cesium +
+  planet-tap NASA Eyes popups) → remaining reads (cameras last-activity, litter robot,
+  updates, network) → camera live feeds (camera_proxy/stream) → MSD room popups →
   serving-origin decision + Fred deploy → RED ALERT filming session for the channel →
   wire remaining reads (cameras last-activity, litter robot, updates, network sensors)
   → camera live feeds (camera_proxy/stream) → MSD room popups → serving-origin decision

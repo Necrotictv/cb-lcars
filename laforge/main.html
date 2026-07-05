@@ -56,6 +56,27 @@
   #boot-l1{font-size:calc(var(--u)*0.95);font-weight:600}
   #boot-l2{font-size:calc(var(--u)*0.95);font-weight:600;margin-top:.25em}
 
+  /* embed "viewscreen" bezel: feeds read as sensor uplinks, not webpages */
+  .feed{position:absolute;inset:calc(var(--u)*0.25);border:1px solid var(--c-peri,#9999cc);
+    border-radius:4px;overflow:hidden;background:#0a0c12}
+  .feed iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+  .cesium-viewer-bottom{display:none!important}  /* hide Cesium credit strip inside the bezel */
+
+  /* viewscreen popup (NASA Eyes, camera feeds): full-screen LCARS-framed overlay */
+  #vpop{position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.72);
+    display:flex;align-items:center;justify-content:center}
+  .vpop-frame{width:78vw;height:80vh;display:flex;flex-direction:column;
+    background:#000;border-radius:calc(var(--u)*0.6);overflow:hidden;
+    border:2px solid var(--c-lilac,#cc99cc)}
+  .vpop-bar{height:calc(var(--u)*1.4);background:var(--c-lilac,#cc99cc);color:#000;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:0 calc(var(--u)*0.6);font-family:Antonio;font-size:calc(var(--u)*0.55);
+    font-weight:600;letter-spacing:.1em;text-transform:uppercase}
+  .vpop-close{cursor:pointer;background:var(--c-salmon,#cc6666);color:#000;
+    padding:calc(var(--u)*0.1) calc(var(--u)*0.5);border-radius:calc(var(--u)*0.5)}
+  .vpop-body{flex:1;position:relative}
+  .vpop-body iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+
   /* alert-condition overlay: pulsing vignette, pointer-transparent.
      ~1.4s pulse — the TNG klaxon cadence, deliberately NOT synced to
      any other animation (§8: no unison loops) */
@@ -89,9 +110,9 @@
 <!-- config.local.js is GITIGNORED (HA token); absent = simulated mode.
      ?v= version query = cache-bust (bump when shipping to the kiosk/Fred) -->
 <script src="config.local.js" onerror="console.warn('[LaForge] no local config — simulated mode')"></script>
-<script src="lcars.js?v=3"></script>
-<script src="floorplan.js?v=3"></script>
-<script src="ha.js?v=3"></script>
-<script src="app.js?v=3"></script>
+<script src="lcars.js?v=4"></script>
+<script src="floorplan.js?v=4"></script>
+<script src="ha.js?v=4"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>

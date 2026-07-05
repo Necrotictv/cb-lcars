@@ -96,6 +96,10 @@ const HA = (() => {
     D.alert = st('input_select.lcards_alert_mode')?.state ?? D.alert;
     if (D.alert !== prevAlert) { prevAlert = D.alert; hooks.onAlert?.(D.alert); }
 
+    /* home coordinates for SCIENCE maps (SURVEY/GEO) — never hardcode */
+    const home = st('zone.home');
+    if (home) D.geo = { lat: home.attributes.latitude, lon: home.attributes.longitude };
+
     D.media = [
       ['DOWNSTAIRS',  st('media_player.downstairs')?.state ?? 'unknown',        num('number.downstairs_volume', 6)],
       ['EVERYWHERE',  st('media_player.everywhere')?.state ?? 'unknown',        5],
