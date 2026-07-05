@@ -124,6 +124,22 @@ LOCAL VIEWS (its top pill row). Format: **VIEW — features (entities today → 
 - **ASTROMETRICS** (chetwode?) — star maps / solar system embeds, flight radar, traffic cams
 - SYSTEMS is NOT a spoke — it's terminal chrome (rail button), config only.
 
+## DEPLOYMENT TARGET (Patrick, 2026-07-04): Fred's webstack
+The terminal ultimately ships to Fred (Proxmox host, 10.0.0.x). Organizational rules:
+
+1. **`laforge/` stays a self-contained static bundle** — relative paths only (already
+   true: main.html + lcars.js + floorplan.js + app.js + assets/). Deploy = copy the folder.
+2. **Serving options** (decide at deploy time):
+   - nginx/caddy container via Portainer (10.0.0.77) — clean, versioned, independent of HA
+   - HA `/config/www/` → served at `http://10.0.0.149:8123/local/laforge/` — zero new infra,
+     same-origin with the HA websocket (simplifies Phase-2 auth/CORS)
+3. **Cache-bust before deploy:** version the script tags (`lcars.js?v=N`) — the stale-cache
+   gotcha will bite kiosks hard otherwise.
+4. **Phase-2 auth note:** if served OUTSIDE HA (nginx), the websocket to 10.0.0.149:8123
+   needs the long-lived token (secrets.yaml) + CORS config; if served from HA /local/,
+   auth can piggyback on the HA session. Weigh at wiring time.
+5. Git repo stays the source of truth; Fred gets deploy copies, never edits.
+
 ## STRETCH GOALS (recorded 2026-07-03 — thematically appropriate embeds)
 - Live **star maps / solar system state** from real astronomy databases — interactive and
   embedded preferred (candidates to research: NASA Eyes on the Solar System embed,

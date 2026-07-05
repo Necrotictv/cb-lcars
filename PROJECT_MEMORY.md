@@ -259,9 +259,101 @@ adding real devices (TP-Link/Tuya) + the floor plan himself later tonight.
   Insight that ended the churn: the two reference sources disagree — intro2 video = chunky TNG,
   images/inspiration/ = thin dense Voyager. Named dialect: chunky TNG frame, authentic per Patrick.
 - New docs: `LAFORGE_DESIGN.md` (nav map, feature scope DRAFT — Patrick to amend, decision log).
-- **NEXT:** amend/lock feature scope → build the real Glance Grid main on the grid-snapped
-  renderer (port createRadiusPath per CUSTOM_BUILD_PLAN step 1) → LIGHTS subscreen first
-  (proves the Option-2 pattern) → MSD when floor plan SVG arrives.
+- **RENDERER v0.1 BUILT + VERIFIED (same session):** `laforge/lcars.js` + `laforge/main.html`.
+  - lcars.js: createRadiusPath ported VERBATIM from ha-lcars-panel SVGUtils.ts (rect shapes,
+    convex `radX*` / concave `radXInner*` corners, caps) + the LOCKED §7 elbow path + a grid
+    engine: `place()` snaps everything to 0.25u and is the ONLY positioning path; seams
+    (0.18u, off-grid by design) are carved INSIDE snapped slots via `seam:{left,...}`.
+  - Debug grid overlay on **G key** — visually verified: headers/panels/rail all on 1u lines,
+    cluster gaps exactly 0.5u. Elbow junctions zoom-verified flush top + bottom.
+  - Screen is ALWAYS exactly 50u wide (`u = clientWidth/50`, ha-lcars-panel convention) —
+    resolution independence by definition. Height snaps to grid.
+  - Glance Grid main renders the locked design: frame (elbow arm IS the top bar / rail),
+    identity, flavor numbers, 6 mock clusters. Mock data — HA wiring is Phase 2.
+- **GIT GOTCHAS (this repo):** it's a SPARSE CHECKOUT (72%) — new top-level dirs are NOT
+  addable with plain `git add`; use `git add --sparse <files>` (plain add fails SILENTLY).
+  Also: whole repo shows CRLF churn in `git status` (Drive/autocrlf) — commit only
+  session files, never `git add -A`. Sandbox bash can't take git index.lock on the Drive
+  mount — run git via Windows PowerShell on Zeke instead.
+- Committed + pushed: 5330a0a (design lock + sketches), 6987afd (laforge/ renderer).
+- **v0.2 SHIPPED same session (commit 83cd291, pushed): tap-through + animations.**
+  - `laforge/app.js`: SPA — main (Glance Grid) ↔ 6 group workspaces (Option-2 pattern).
+    Content-wipe nav (110ms out / 160ms in — TNG screens cut, they don't dissolve).
+    ONE mock `DATA` object feeds all screens → state survives navigation (verified:
+    dragged FOYER 45→80 in LIGHTS workspace, main cluster showed 80 on return).
+    Phase 2 = swap DATA for HA websocket state; views are already dumb.
+  - Subscreen nav row: white MAIN pill (structural chrome, NOT a category color —
+    avoids double-HOME confusion) + 6 group pills, inactive ones breathe.
+  - Animations (§8 discipline — every element own random duration+delay, no sync):
+    breathe(), digits() live flavor-number streams, camera scan sweeps (per-cam tempo),
+    CORE gauge drift (random walk), onTap brightness flash (60ms in / 180ms out).
+  - LIGHTS workspace: DRAGGABLE vertical transporter dimmers (pointer capture,
+    tap-to-set works too). Handler is where light.turn_on brightness call goes in Phase 2.
+  - GOTCHA: template values must Math.round() — drifting floats leak into re-renders.
+  - Verified by driving Chrome: main → LIGHTS → slider set → MAIN, all junctions clean.
+- **SESSION-END FEEDBACK (Patrick, 2026-07-03) — v0.3 spec, see LAFORGE_DESIGN.md backlog:**
+  Loved: nav flow, content wipe, flavor digits, detail level ("Bravo"). Adjustments:
+  (1) SYSTEMS rail button → UI config panel (palette TNG/DS9/VOY, ambient sounds,
+  voice-interface settings); (2) MODE rail button → voice-interface MIC MUTE (ignore +
+  stop caching audio; button goes inactive-color + breathing while muted); (3) ALL
+  settings persist through restarts (localStorage now, HA helpers Phase 2);
+  (4) NAV CHANGE: hub-and-spoke — Main↔subscreen only, drop group-to-group pills;
+  subscreen top section becomes flavor + screen-specific nav; (5) screensaver = dim +
+  spinning Federation logo (FedSign.gif already catalogued, or find cleaner asset).
+  Stretch goals recorded in LAFORGE_DESIGN.md: star maps/solar system embeds, Windy,
+  sea levels/moon phases, flight radar, traffic cams — cool + embeddable + thematic.
+- **v0.3a SHIPPED (commit 25a48aa, pushed):** hub-and-spoke nav (subscreens = MAIN +
+  screen-local views only; `local:` arrays on GROUPS) · persistent settings store
+  (`LCARS.settings`, localStorage key `laforge-settings`) · era palettes TNG/DS9/VOY
+  (role tables in `LCARS.PALETTES`, applied via `setPalette()` + CSS vars `--c-*`;
+  content CSS uses the vars so panels re-skin too) · SYSTEMS rail button → terminal
+  config screen (palette picker applies instantly, ambient/beeps flags, voice readout:
+  wake word COMPUTER, voice MAJEL) · MODE rail button → mic mute (idle lilac + breathe,
+  label MIC MUTED; also toggleable from SYSTEMS screen). ALL VERIFIED incl. restart
+  persistence (reload boots in VOY + muted). Chrome gotcha: if extension disconnected,
+  Chrome may be fully closed — launch via PowerShell `Start-Process chrome.exe <url>`.
+- **v0.3b SHIPPED (commits e6c700c + 9e7ffd9, pushed):** screensaver (idle `ssMinutes`
+  setting default 5, dim → spinning Fed seal + clock, tap wakes, S = dev toggle;
+  FedSign.gif downloaded LOCALLY to laforge/assets/ w/ Patrick approval — lcars.org.uk
+  SSL is broken, https hotlink fails, http works; text fallback retained) ·
+  **SPOKE MAP v1** in LAFORGE_DESIGN.md (every group's local views + entities; future
+  ASTROMETRICS spoke noted) · **MSD floor plan** live in HOME workspace — data-driven
+  `laforge/floorplan.js` (decks + exterior band, rooms w/ entity lists, pulsing category
+  dots, tap targets ready for Phase-2 room popups).
+- **SCREENSAVER MEDIA LADDER (commit 87a1cf2):** saver prefers `laforge/assets/ufp_spin.mp4`
+  → falls back to local FedSign.gif → text. Patrick found a 3D UFP spin render he wants
+  (YouTube xQPE5jLGdDI); HE downloads it himself (yt-dlp) into laforge/assets/ as
+  ufp_spin.mp4 — Claude doesn't rip YouTube. Preflight HEAD checks, not media error
+  events (video 404s hang forever on python http.server, error never fires).
+- **FLOOR PLAN DECISION (Patrick):** Sweet Home 3D route — he draws the real plan,
+  exports SVG, drops it in `laforge/assets/`; we integrate as the MSD base layer and
+  keep floorplan.js as the overlay data (dots/tap zones). DRAFT layout in floorplan.js
+  is guessed from entities (deck1: living/foyer/kitchen/downstairs; deck2: bedroom P /
+  Izzy / bath; exterior: front door/backyard) — awaiting his SVG.
+- **v0.3c BOOT SEQUENCE SHIPPED (commit 8168194):** first-load choreography — top bar
+  sweeps L→R, rail top→bottom, console closes frame, typed "LCARS COMPUTER ACCESS
+  47-2210" / "COMMAND INTERFACE READY · ONLINE", content populates in reading order
+  (~2.8s). Delays derive from data-ux/uy grid coords (no tagging). ANY tap skips.
+  **B key replays the boot** (dev/testing + FILMING the intro for YouTube).
+  GOTCHA (cost a debug cycle): background tabs clamp setInterval to 1s — typing must
+  derive char-count from performance.now(), never tick count, or it desyncs from
+  WAAPI animations (which keep wall time). Foreground/kiosk tabs unaffected.
+- **AUTHENTICITY RESOURCE (Patrick, 2026-07-04): thelcars.com** — pure HTML/CSS LCARS
+  template. Harvested their 26 canonical named colors (table in UI_STANDARDS §3) →
+  new **`classic` palette** (commit 3b955b0), 4th option in SYSTEMS picker. Their values
+  are punchier than our video-sampled tng (compression mutes saturation) — Patrick
+  eyeballed CLASSIC live and it reads notably more show-accurate. Trust classic values
+  for future roles. Site also has responsive pure-CSS techniques worth revisiting for
+  the Lit port. VALUES only — never copy their CSS.
+- **CACHE GOTCHA:** Chrome caches lcars.js/app.js across sessions — after editing,
+  hard-reload (ctrl+shift+r) or the page runs STALE code (symptom: new palette/feature
+  silently missing, setPalette falls back to tng). Version the script tags before
+  kiosk deployment.
+- **NEXT SESSION:** wire local-view pills (LIGHTS INTERIOR/EXTERIOR/SCENES, SECURITY
+  CAMERAS/PERIMETER/ALERTS per spoke map) → remaining workspaces → Phase 2 HA wiring →
+  floor plan SVG integration when Patrick's Sweet Home 3D export arrives → Lit port.
+  Patrick still to supply: assets/ufp_spin.mp4 (yt-dlp one-liner given). Stretch queue:
+  Windy embed (CLIMATE·SURVEY), ASTROMETRICS spoke (7th cluster = grid decision).
 
 ### 2026-06-21 (cont.) — browser_mod installed + tap-to-popup detail panels (v3 #2)
 - **Installed browser_mod 2 v2.13.5** (thomasloven, HACS Default) via HACS → `/config/custom_components/browser_mod`.

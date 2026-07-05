@@ -224,12 +224,15 @@ function renderGroup(scr, W, H, g) {
      row belongs to THIS screen's local views (canon §3: inactive = idle lilac). */
   const home = scr.button(cx0, BARH + 0.5, 4, 'MAIN', { color:'#d8c7ec', on:true, ends:'pill' });
   scr.onTap(home, () => navigate('main'));
+  const activeView = localView[g.id] ?? 0;
   (g.local ?? []).forEach((label, i) => {
-    const active = i === 0;                       // first local view active (mock until workspaces get views)
+    const active = i === activeView;
     const b = scr.button(cx0 + 4.5 + i * 6, BARH + 0.5, 5.5, label,
       { color: active ? g.color : 'lilac', on: active, ends:'pill' });
-    if (!active) scr.breathe(b, { soft:true });
-    scr.onTap(b, () => {});                       // local view switching lands with each workspace build
+    if (!active) {
+      scr.breathe(b, { soft:true });
+      scr.onTap(b, () => { localView[g.id] = i; render(); });   // instant mode switch (TNG screens cut)
+    }
   });
   scr.digits(scr.place(cx0, BARH + 2.75, 18, 1.5,
     `font-size:${scr.U(0.4)}px;color:#ff9c00;letter-spacing:.14em;line-height:1.6;opacity:.85;`), 2, 4);
@@ -237,11 +240,9 @@ function renderGroup(scr, W, H, g) {
   scr.text(cx1 - 18, BARH + 2.5, 18, 2.5, g.label, { fs:'title', color:'orange', align:'right', weight:700 });
   scr.text(cx1 - 18, BARH + 5, 18, 0.5, '', { fs:'data', color:'gold', align:'right' }).id = 'clk';
 
-  /* ---- lower content: the group's workspace ---- */
+  /* ---- lower content: the active local view's workspace ---- */
   const wy0 = dy2 + DTH + GAP, wy1 = H - BARH - GAP;
-  if (g.id === 'lights') workspaceLights(scr, cx0, wy0, cx1, wy1);
-  else if (g.id === 'home') workspaceHome(scr, cx0, wy0, cx1, wy1, g);
-  else workspaceStandby(scr, cx0, wy0, cx1, wy1, g);
+  renderWorkspace(scr, g, activeView, cx0, wy0, cx1, wy1);
 }
 
 /* ============================ SYSTEMS SCREEN ============================
@@ -307,22 +308,29 @@ function renderSystems(scr, W, H) {
   scr.onTap(mb, () => { LCARS.settings.set('micMute', !muted); render(); });
 }
 
-/* LIGHTS workspace — interactive transporter dimmers (drag them!) */
-function workspaceLights(scr, x0, y0, x1, y1) {
-  const w3 = Math.floor(((x1 - x0) - 2 * GAP) / 3 * 4) / 4;
-  const col = (i, color, title) => {
-    const x = x0 + i * (w3 + GAP);
-    scr.shape(x, y0, w3, 1.1, { capRight:true, color });
-    scr.text(x + 0.5, y0, w3 - 1, 1.1, title, { fs:'sub', color:'black', weight:600 });
-    return scr.panel(x, y0 + 1.35, w3, y1 - y0 - 1.35);
-  };
-  const dim = col(0, 'canary', 'DIMMERS');
-  dim.innerHTML = `<div class="slrow">` + DATA.dimmers.map(([k,v],i) =>
-    `<div class="vsl" data-i="${i}"><div class="vtrack"><div class="vfill" style="height:${v}%"></div>
-     <div class="vhandle" style="bottom:${v}%"></div></div><div class="vval">${v||'OFF'}</div><div class="vlab">${k}</div></div>`).join('') + `</div>`;
-  /* drag behavior: pointer position → level. Phase 2: also call light.turn_on
-     with brightness — the handler below is where that service call goes. */
-  dim.querySelectorAll('.vsl').forEach(sl => {
+/* ============================ WORKSPACES ============================
+   One builder per (group × local view) — the SPOKE MAP (LAFORGE_DESIGN.md)
+   made executable. All mock data; Phase 2 swaps DATA for HA state. */
+let localView = {};   // groupId → active view index (session-scoped; kiosk boots to defaults)
+
+/* equal-width titled panel columns — the standard workspace skeleton */
+function wsCols(scr, x0, y0, x1, y1, defs) {
+  const n = defs.length, w = Math.floor(((x1 - x0) - (n - 1) * GAP) / n * 4) / 4;
+  return defs.map(([color, title], i) => {
+    const x = x0 + i * (w + GAP);
+    scr.shape(x, y0, w, 1.1, { capRight:true, color });
+    scr.text(x + 0.5, y0, w - 1, 1.1, title, { fs:'sub', color:'black', weight:600 });
+    return scr.panel(x, y0 + 1.35, w, y1 - y0 - 1.35);
+  });
+}
+
+/* interactive transporter dimmers for a subset of DATA.dimmers (by index).
+   Phase 2: the set() handler is where light.turn_on{brightness} goes. */
+function buildDimmers(panel, idxs) {
+  panel.innerHTML = `<div class="slrow">` + idxs.map(i => { const [k, v] = DATA.dimmers[i]; return `
+    <div class="vsl" data-i="${i}"><div class="vtrack"><div class="vfill" style="height:${v}%"></div>
+    <div class="vhandle" style="bottom:${v}%"></div></div><div class="vval">${v||'OFF'}</div><div class="vlab">${k}</div></div>`; }).join('') + `</div>`;
+  panel.querySelectorAll('.vsl').forEach(sl => {
     const track = sl.querySelector('.vtrack');
     const set = e => {
       const r = track.getBoundingClientRect();
@@ -336,33 +344,155 @@ function workspaceLights(scr, x0, y0, x1, y1) {
       track.onpointermove = set; });
     track.addEventListener('pointerup', () => track.onpointermove = null);
   });
-
-  const sw = col(1, 'peach', 'SWITCHES');
-  sw.innerHTML = `<div class="btncol">
-    <div class="wbtn" style="background:#f3f08b">BACKYARD FLOOD</div>
-    <div class="wbtn" style="background:#9999cc">ALL OFF</div>
-    <div class="wbtn" style="background:#cc99cc">SCENE · EVENING</div></div>`;
-  sw.querySelectorAll('.wbtn').forEach(b => scr.onTap(b, () => {}));
-
-  const st = col(2, 'lilac', 'STATUS');
-  st.innerHTML = `<div class="clb">ACTIVE FIXTURES <span class="v">3 / 5</span><br>
-    POWER DRAW <span class="v">142 W</span><br>LAST EVENT <span class="v">KITCHEN 90%</span></div>`;
 }
 
-/* HOME workspace — the house as a Master Systems Display (floorplan.js data).
-   Rooms are tap targets; Phase 2 pops each room's entity controls. */
-function workspaceHome(scr, x0, y0, x1, y1, g) {
-  scr.shape(x0, y0, x1 - x0, 1.1, { capRight:true, color:g.color });
-  scr.text(x0 + 0.5, y0, 24, 1.1, 'RESIDENCE · MASTER SYSTEMS DISPLAY', { fs:'sub', color:'black', weight:600 });
-  const p = scr.panel(x0, y0 + 1.35, x1 - x0, y1 - y0 - 1.35);
-  p.style.padding = scr.U(0.5) + 'px';
-  const C = k => getComputedStyle(document.documentElement).getPropertyValue(k).trim();
-  renderMSD(p, C);
-  /* room taps: popups land with Phase-2 entity wiring — flash for now */
-  p.querySelectorAll('[data-room]').forEach(el =>
-    el.addEventListener('pointerdown', () => {
-      el.animate([{opacity:1},{opacity:.3},{opacity:1}], {duration:220});
-    }));
+const btns = (scr, panel, items) => {   // stacked workspace buttons, category-colored
+  panel.innerHTML = `<div class="btncol">` + items.map(([c, t]) =>
+    `<div class="wbtn" style="background:var(--c-${c})">${t}</div>`).join('') + `</div>`;
+  panel.querySelectorAll('.wbtn').forEach(b => scr.onTap(b, () => {}));  // Phase 2: service calls
+};
+
+function renderWorkspace(scr, g, view, x0, y0, x1, y1) {
+  const key = g.id + ':' + ((g.local ?? [])[view] ?? '');
+  const cols = defs => wsCols(scr, x0, y0, x1, y1, defs);
+  switch (key) {
+
+    /* ---------------- LIGHTS ---------------- */
+    case 'lights:ALL': {
+      const [dim, sw, st] = cols([['canary','DIMMERS'], ['peach','SWITCHES'], ['lilac','STATUS']]);
+      buildDimmers(dim, [0, 1, 2, 3]);
+      btns(scr, sw, [['canary','BACKYARD FLOOD'], ['peri','ALL OFF'], ['lilac','SCENE · EVENING']]);
+      st.innerHTML = `<div class="clb">ACTIVE FIXTURES <span class="v">3 / 5</span><br>
+        POWER DRAW <span class="v">142 W</span><br>LAST EVENT <span class="v">KITCHEN 90%</span></div>`;
+      break; }
+    case 'lights:INTERIOR': {
+      const [dim, sc] = cols([['canary','DIMMERS · INTERIOR'], ['lilac','QUICK SCENES']]);
+      buildDimmers(dim, [0, 1, 2]);
+      btns(scr, sc, [['lilac','EVENING'], ['magenta','MOVIE'], ['peri','ALL INTERIOR OFF']]);
+      break; }
+    case 'lights:EXTERIOR': {
+      const [fl, st] = cols([['canary','FLOOD CONTROL'], ['lilac','PERIMETER STATUS']]);
+      btns(scr, fl, [['canary','BACKYARD FLOOD'], ['peri','DUSK-TO-DAWN · AUTO']]);
+      st.innerHTML = `<div class="clb">BACKYARD FLOOD <span class="v">OFF</span><br>
+        LAST MOTION <span class="v">BACKYARD 19:42</span><br>SUNSET TRIGGER <span class="v">20:31</span></div>`;
+      break; }
+    case 'lights:SCENES': {
+      const [sc, inf] = cols([['canary','SCENE SELECT'], ['lilac','SCENE DETAIL']]);
+      btns(scr, sc, [['lilac','EVENING'], ['magenta','MOVIE'], ['gold','GOODNIGHT'], ['peri','ALL OFF']]);
+      inf.innerHTML = `<div class="clb">EVENING <span class="v">LIVING 40 · FOYER 25</span><br>
+        MOVIE <span class="v">LIVING 12 · KITCHEN 0</span><br>GOODNIGHT <span class="v">ALL OFF · FLOOD AUTO</span><br>
+        <span class="w">SCENES BUILD IN PHASE 2 (HA)</span></div>`;
+      break; }
+
+    /* ---------------- SECURITY ---------------- */
+    case 'security:CAMERAS': {
+      const [c1, c2, c3] = cols([['salmon','FRONT DOOR'], ['salmon','BACKYARD'], ['salmon','DOWNSTAIRS']]);
+      [c1, c2, c3].forEach((p, i) => p.innerHTML =
+        `<div class="cam" style="height:78%;margin:4%"><i class="scan"></i></div>
+         <div class="clb" style="height:auto">LAST ACTIVITY <span class="v">${['18:22','19:42','12:05'][i]}</span></div>`);
+      break; }
+    case 'security:PERIMETER': {
+      const [mo, si] = cols([['salmon','MOTION DETECTION'], ['peach','SIRENS · DETERRENT']]);
+      btns(scr, mo, [['salmon','FRONT DOOR · ARMED'], ['salmon','BACKYARD · ARMED'], ['salmon','DOWNSTAIRS · ARMED']]);
+      btns(scr, si, [['salmon','SIREN · DOWNSTAIRS'], ['salmon','SIREN · BACKYARD'], ['canary','FLOOD · DETERRENT']]);
+      break; }
+    case 'security:ALERTS': {
+      const [al, log] = cols([['salmon','ALERT CONDITION'], ['lilac','EVENT LOG']]);
+      btns(scr, al, [['salmon','◤ RED ALERT'], ['gold','YELLOW ALERT'], ['peri','STAND DOWN']]);
+      log.innerHTML = `<div class="clb">19:42 <span class="v">MOTION · BACKYARD</span><br>
+        18:22 <span class="v">MOTION · FRONT DOOR</span><br>12:05 <span class="v">MOTION · DOWNSTAIRS</span><br>
+        07:14 <span class="v">CONDITION GREEN · AUTO</span></div>`;
+      break; }
+
+    /* ---------------- CLIMATE ---------------- */
+    case 'climate:CURRENT': {
+      const [now, sun] = cols([['lilac','ATMOSPHERIC · CURRENT'], ['peri','SOLAR']]);
+      now.innerHTML = `<div class="clb"><span class="bigval">71°F</span><br><br>
+        CONDITION <span class="v">CLEAR</span> · HUMIDITY <span class="v">44%</span><br>
+        WIND <span class="v">4 MPH NW</span> · UV <span class="v">3</span></div>`;
+      sun.innerHTML = `<div class="clb">SUNRISE <span class="v">05:48</span><br>SUNSET <span class="v">20:31</span><br>
+        MOON <span class="v">WANING GIBBOUS</span><br>DAYLIGHT <span class="v">14H 43M</span></div>`;
+      break; }
+    case 'climate:FORECAST': {
+      const [fc] = cols([['lilac','5-DAY FORECAST']]);
+      fc.innerHTML = `<div class="clb" style="display:flex;gap:2%;align-items:stretch">` +
+        [['SAT','CLEAR',88,66], ['SUN','P/CLOUDY',84,64], ['MON','STORMS',79,63], ['TUE','CLEAR',82,61], ['WED','CLEAR',85,63]]
+        .map(([d, c, h, l]) => `<div style="flex:1;text-align:center;border:1px solid #39415e;border-radius:4px;padding:4% 0">
+          <span class="v">${d}</span><br><br>${c}<br><br><span class="bigval" style="font-size:calc(var(--u)*1.1)">${h}°</span><br>${l}°</div>`).join('') + `</div>`;
+      break; }
+    case 'climate:SURVEY': { workspaceStandby(scr, x0, y0, x1, y1, g, 'PLANETARY SURVEY · AWAITING WINDY UPLINK'); break; }
+
+    /* ---------------- MEDIA ---------------- */
+    case 'media:PLAYERS': {
+      const [pl] = cols([['magenta','AUDIO PLAYERS']]);
+      pl.innerHTML = `<div class="clb">` + [['DOWNSTAIRS','IDLE',6], ['EVERYWHERE','STANDBY',5], ['BEDROOM · P','STANDBY',4], ['IZZY’S ROOM','STANDBY',3]]
+        .map(([n, s, v]) => `<div class="mb"><div class="k" style="width:calc(var(--u)*6)">${n}</div>
+          <div class="t"><i style="width:${v * 9}%"></i></div><div class="n">${v}</div>
+          <div style="width:calc(var(--u)*4);text-align:right;color:var(--c-orange)">${s}</div></div>`).join('') + `</div>`;
+      break; }
+    case 'media:ANNOUNCE': {
+      const [an, st] = cols([['magenta','SHIP-WIDE ANNOUNCE'], ['lilac','VOICE']]);
+      btns(scr, an, [['magenta','ALL DECKS'], ['magenta','DECK 01 · MAIN'], ['magenta','DECK 02 · UPPER']]);
+      st.innerHTML = `<div class="clb">VOICE <span class="v">MAJEL</span><br>TTS <span class="w">AWAITING VOICE LAB</span><br>
+        MIC <span class="v">${LCARS.settings.get('micMute', false) ? 'MUTED' : 'LIVE'}</span></div>`;
+      break; }
+    case 'media:VOLUME': {
+      const [vol] = cols([['magenta','VOLUME · ALL DEVICES']]);
+      vol.innerHTML = `<div class="clb">` + [['MASTER AUDIO',50], ['DOWNSTAIRS',55], ['EVERYWHERE',45], ['BEDROOM · P',36], ['IZZY’S ROOM',27]]
+        .map(([n, v]) => `<div class="mb"><div class="k" style="width:calc(var(--u)*6)">${n}</div>
+          <div class="t"><i style="width:${v}%;background:var(--c-magenta)"></i></div><div class="n">${v}</div></div>`).join('') + `</div>`;
+      break; }
+
+    /* ---------------- HOME ---------------- */
+    case 'home:MSD': {
+      scr.shape(x0, y0, x1 - x0, 1.1, { capRight:true, color:g.color });
+      scr.text(x0 + 0.5, y0, 24, 1.1, 'RESIDENCE · MASTER SYSTEMS DISPLAY', { fs:'sub', color:'black', weight:600 });
+      const p = scr.panel(x0, y0 + 1.35, x1 - x0, y1 - y0 - 1.35);
+      p.style.padding = scr.U(0.5) + 'px';
+      renderMSD(p, k => getComputedStyle(document.documentElement).getPropertyValue(k).trim());
+      p.querySelectorAll('[data-room]').forEach(el => el.addEventListener('pointerdown', () =>
+        el.animate([{opacity:1},{opacity:.3},{opacity:1}], {duration:220})));   // Phase 2: room popup
+      break; }
+    case 'home:CALENDAR': {
+      const [today, next] = cols([['peri','TODAY'], ['lilac','UPCOMING']]);
+      today.innerHTML = `<div class="clb">14:00 <span class="v">STANDUP</span><br>18:30 <span class="v">FILM SESSION</span></div>`;
+      next.innerHTML = `<div class="clb">SAT 10:00 <span class="v">3D PRINT · BRACKET BATCH</span><br>
+        SUN 13:00 <span class="v">HOME LAB · OPNSENSE PREP</span><br>MON 09:00 <span class="v">STANDUP</span></div>`;
+      break; }
+    case 'home:ROUTINES': {
+      const [rt, cats] = cols([['peri','ALEXA ROUTINES'], ['lilac','FELINE SYSTEMS']]);
+      btns(scr, rt, [['peri','GOOD NIGHT'], ['peri','I’M HOME'], ['peri','KICK OFF MY DAY'], ['peri','SLEEPY TIME']]);
+      cats.innerHTML = `<div class="clb">MELIA <span class="v">3 VISITS · 9.2 LB</span><br>
+        PEACHY <span class="v">5 VISITS · 11.4 LB</span><br>LITTER <span class="v">62%</span> · DRAWER <span class="v">41%</span><br>
+        LAST CYCLE <span class="v">12:40</span></div>`;
+      break; }
+
+    /* ---------------- CORE ---------------- */
+    case 'core:FRED': {
+      const [g1, al] = cols([['peach','FRED · WARP CORE'], ['salmon','ALARMS']]);
+      g1.innerHTML = `<div class="clb">` + [['CPU',34], ['MEMORY',61], ['LOAD',28], ['DISK I/O',12]]
+        .map(([n, v]) => `<div class="mb"><div class="k" style="width:calc(var(--u)*4.5)">${n}</div>
+          <div class="t"><i style="width:${v}%;background:var(--c-peach)"></i></div><div class="n">${v}</div></div>`).join('') + `</div>`;
+      al.innerHTML = `<div class="clb"><span class="w">1 ACTIVE</span> · SMART WARN · SDB<br><br>
+        BACKUP <span class="v">OK · 03:00</span><br>UPTIME <span class="v">21 DAYS</span></div>`;
+      break; }
+    case 'core:NETWORK': {
+      const [wan, lan] = cols([['peach','WAN · SUBSPACE LINK'], ['peri','LAN']]);
+      wan.innerHTML = `<div class="clb">STATUS <span class="v">ONLINE</span><br>IP <span class="v">73.—.—.—</span><br>
+        DOWN <span class="v">842 MBPS</span> · UP <span class="v">38 MBPS</span></div>`;
+      lan.innerHTML = `<div class="clb">GATEWAY <span class="v">XFINITY (OPNSENSE PENDING)</span><br>
+        HAOS <span class="v">10.0.0.149</span> · PORTAINER <span class="v">10.0.0.77</span><br>
+        NTOPNG <span class="w">PHASE 2</span></div>`;
+      break; }
+    case 'core:UPDATES': {
+      const [up] = cols([['peach','SOFTWARE UPDATES']]);
+      up.innerHTML = `<div class="clb">HA CORE <span class="v">UP TO DATE</span><br>
+        LCARDS <span class="v">UP TO DATE</span><br>HA-LCARS <span class="v">UP TO DATE</span><br>
+        HACS <span class="v">UP TO DATE</span><br><br><span class="w">LIVE STATUS IN PHASE 2</span></div>`;
+      break; }
+
+    default: workspaceStandby(scr, x0, y0, x1, y1, g);
+  }
 }
 
 /* ============================ BOOT SEQUENCE ============================
@@ -484,13 +614,14 @@ addEventListener('keydown', e => {
 });
 SAVER.arm();
 
-/* placeholder workspace for groups not built yet — still animated, still LCARS */
-function workspaceStandby(scr, x0, y0, x1, y1, g) {
+/* placeholder workspace — still animated, still LCARS */
+function workspaceStandby(scr, x0, y0, x1, y1, g, msg) {
   scr.shape(x0, y0, x1 - x0, 1.1, { capRight:true, color:g.color });
   scr.text(x0 + 0.5, y0, 20, 1.1, g.label + ' · SYSTEMS', { fs:'sub', color:'black', weight:600 });
   const p = scr.panel(x0, y0 + 1.35, x1 - x0, y1 - y0 - 1.35);
   p.innerHTML = `<div class="clb" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%">
-    <div class="standby">■ STANDBY</div><div style="opacity:.6;margin-top:.6em">WORKSPACE PENDING · CONTENT BUILD SCHEDULED</div></div>`;
+    <div class="standby">■ STANDBY</div>
+    <div style="opacity:.6;margin-top:.6em">${msg ?? 'WORKSPACE PENDING · CONTENT BUILD SCHEDULED'}</div></div>`;
   scr.breathe(p.querySelector('.standby'), { soft:true });
 }
 
