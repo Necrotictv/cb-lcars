@@ -54,6 +54,12 @@ function navigate(to) {
     };
 }
 
+let needsBoot = true;   // boot choreography plays exactly once, on first load
+let lastScr = null;     // kept for dev tools (B = replay boot, for testing/filming)
+addEventListener('keydown', e => {
+  if (e.key.toLowerCase() === 'b' && lastScr) playBoot(lastScr);
+});
+
 function render() {
   timers.forEach(clearInterval); timers = [];
   root.innerHTML = '';
@@ -64,6 +70,8 @@ function render() {
   if (current === 'main') renderMain(scr, W, H);
   else if (current === 'systems') renderSystems(scr, W, H);
   else renderGroup(scr, W, H, GROUPS.find(g => g.id === current));
+  lastScr = scr;
+  if (needsBoot) { needsBoot = false; playBoot(scr); }
   /* live stardate/clock — every screen has one */
   const tick = () => { const d = new Date(), p = n => String(n).padStart(2,'0');
     const el = document.getElementById('clk');
@@ -354,6 +362,66 @@ function workspaceHome(scr, x0, y0, x1, y1, g) {
     el.addEventListener('pointerdown', () => {
       el.animate([{opacity:1},{opacity:.3},{opacity:1}], {duration:220});
     }));
+}
+
+/* ============================ BOOT SEQUENCE ============================
+   First-load choreography (intro2 vibe): the frame draws itself in — top bar
+   sweeps left→right, rail runs top→bottom, console closes the loop — while
+   "LCARS COMPUTER ACCESS" types out; then the work area populates in reading
+   order. ~2.8s total. ANY TAP SKIPS to the finished state (kiosk-friendly).
+   Geometry-driven delays: every placed element carries data-ux/uy from the
+   grid engine, so choreography needs no per-element tagging. */
+function playBoot(scr) {
+  const anims = [];
+  const uh = scr.uh;
+  const delayFor = el => {
+    const x = +el.dataset.ux, y = +el.dataset.uy;
+    if (y < 1.05)        return 150 + x * 8;          // top bar: sweep L→R
+    if (x < 0.05)        return 500 + y * 22;         // rail + elbows: top→bottom
+    if (y > uh - 4.6)    return 1050 + x * 6;         // console bar: close the frame
+    return 1550 + y * 26 + x * 8;                     // content: reading order
+  };
+  [...root.children].filter(el => el.dataset.ux !== undefined).forEach(el =>
+    anims.push(el.animate([{ opacity: 0 }, { opacity: 1 }],
+      { delay: delayFor(el), duration: 170, fill: 'backwards', easing: 'ease-out' })));
+
+  /* typed announcement, top-right over the black work area */
+  const ov = document.createElement('div');
+  ov.className = 'boot-ov';
+  ov.innerHTML = '<div id="boot-l1"></div><div id="boot-l2"></div>';
+  root.appendChild(ov);
+  /* WALL-CLOCK typing: chars derive from elapsed time, not tick count.
+     WHY: background tabs clamp setInterval to 1s ticks; WAAPI keeps real
+     time. Deriving from performance.now() keeps text and frame in sync no
+     matter how the timers are throttled. */
+  let typers = [];
+  const typeAt = (el, html, t0, done) => {     // t0 = when typing starts (may be future)
+    const plain = html.replace(/<[^>]*>/g, '');
+    const t = setInterval(() => {
+      const n = Math.floor((performance.now() - t0) / 26);
+      if (n <= 0) return;
+      if (n >= plain.length) { clearInterval(t); el.innerHTML = html; done?.(); }
+      else el.textContent = plain.slice(0, n) + '▌';
+    }, 26);
+    typers.push(t);
+  };
+  typeAt(document.getElementById('boot-l1'), 'LCARS COMPUTER ACCESS 47-2210',
+    performance.now() + 250, () =>
+      typeAt(document.getElementById('boot-l2'),
+        'COMMAND INTERFACE READY <b style="color:#fff">· ONLINE</b>',
+        performance.now() + 350, () => setTimeout(finish, 900)));
+
+  let finished = false;
+  function finish() {                          // also the skip target
+    if (finished) return; finished = true;
+    typers.forEach(clearInterval);
+    anims.forEach(a => a.finish());
+    ov.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 350, fill: 'forwards' })
+      .onfinish = () => ov.remove();
+    removeEventListener('pointerdown', finish, true);
+  }
+  addEventListener('pointerdown', finish, true);   // tap = skip
+  /* sound hook: boot chirp goes here when the sound pack lands (settings.beeps) */
 }
 
 /* ============================ SCREENSAVER ============================

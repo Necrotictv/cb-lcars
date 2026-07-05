@@ -48,6 +48,13 @@
   .vval{font-size:calc(var(--u)*0.7);color:var(--c-orange,#ff9c00);font-family:Antonio}
   .vlab{font-size:calc(var(--u)*0.4);color:var(--c-lilac,#cc99cc);letter-spacing:.1em}
 
+  /* boot-sequence typed announcement (first load only) */
+  .boot-ov{position:absolute;top:38%;right:calc(var(--u)*1.5);z-index:60;
+    text-align:right;font-family:Antonio;color:var(--c-orange,#ff9c00);
+    pointer-events:none;letter-spacing:.1em;text-transform:uppercase}
+  #boot-l1{font-size:calc(var(--u)*0.95);font-weight:600}
+  #boot-l2{font-size:calc(var(--u)*0.95);font-weight:600;margin-top:.25em}
+
   /* screensaver: dim to black, spinning Federation seal, small clock */
   #saver{position:fixed;inset:0;background:#000;z-index:9998;display:flex;
     flex-direction:column;align-items:center;justify-content:center;gap:calc(var(--u)*1);cursor:pointer}
