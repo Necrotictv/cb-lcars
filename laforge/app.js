@@ -32,11 +32,17 @@ const GROUPS = [
   { id:'core',     label:'CORE',     color:'peach',   badge:'NOMINAL',  local:['FRED','NETWORK','UPDATES'] },
 ];
 
-/* ---- mock live data (Phase 2: replaced by HA websocket state) ---- */
+/* ---- shared data object. Boots with mock values; ha.js sync() overwrites
+   them with live HA state when config.local.js provides a token. ---- */
 const DATA = {
   dimmers: [ ['LIVING',72], ['FOYER',45], ['KITCHEN',90], ['BACKYD',0] ],
-  core:    { cpu:34, mem:61 },
+  core:    { cpu:34, mem:61, alarms:'1' },
+  climate: { temp:71, condition:'CLEAR', humidity:44, wind:4, sunset:'20:31', sunrise:'05:48' },
+  alert:   'green_alert',
+  floodOn: false,
+  media:   [ ['DOWNSTAIRS','idle',6], ['EVERYWHERE','standby',5], ['BEDROOM · P','standby',4], ['IZZY’S ROOM','standby',3] ],
 };
+const alertLabel = () => (DATA.alert || 'green').split('_')[0].toUpperCase();
 
 let current = 'main';        // which screen is showing
 let timers = [];             // per-screen intervals — cleared on nav (no leaks)
@@ -86,9 +92,12 @@ function chrome(scr, W, H, consoleLabel, elbowTop, elbowBottom) {
   scr.elbow(0, 0, { corner:'tl', tv:RAIL, th:BARH, ro:RO, ri:RI, w:EW, h:EH, color:elbowTop });
   scr.bar(EW, 0, 2, BARH, 'gold', { left:true });
   scr.bar(EW + 2, 0, W - EW - 2 - txtW - capW, BARH, 'lilac', { left:true });
+  const status = HA.connected
+    ? '<b style="color:#fff">· ONLINE</b>'
+    : (window.LAFORGE_CONFIG ? '<b style="color:var(--c-salmon)">· OFFLINE</b>' : '<b style="color:var(--c-lilac)">· SIMULATED</b>');
   scr.text(W - txtW - capW, 0, txtW - 0.5, BARH,
-    'U.S.S. JARVIS · ALL SYSTEMS <b style="color:#fff">· ONLINE</b>',
-    { fs:'sub', color:'orange', align:'right', weight:600 });
+    'U.S.S. JARVIS · ALL SYSTEMS ' + status,
+    { fs:'sub', color:'orange', align:'right', weight:600 }).id = 'ha-status';
   scr.shape(W - capW, 0, capW, BARH, { capRight:true, color:'peri' });
   scr.elbow(0, H - EH, { corner:'bl', tv:RAIL, th:BARH, ro:RO, ri:RI, w:EW, h:EH, color:elbowBottom });
   scr.text(EW + 0.25, H - BARH, 8, BARH, consoleLabel, { fs:'sub', color:'orange', weight:600 });
@@ -141,8 +150,15 @@ function renderMain(scr, W, H) {
   const cw = Math.floor(((cx1 - cx0) - (cols - 1) * GAP) / cols * 4) / 4;
   const ch = Math.floor(((cy1 - gy0) - GAP) / 2 * 4) / 4;
 
+  /* badges compute from DATA so live values show without code changes */
+  const badges = {
+    lights: (DATA.floodOn ? '4/5' : '3/5') + ' ON', security: alertLabel(),
+    climate: DATA.climate.temp + '°F', media: 'IDLE',
+    home: '2 EVENTS', core: DATA.core.alarms === '0' ? 'NOMINAL' : 'ALARM',
+  };
   GROUPS.forEach((g, i) => {
     const x = cx0 + (i % 3) * (cw + GAP), y = gy0 + Math.floor(i / 3) * (ch + GAP);
+    g.badge = badges[g.id] ?? g.badge;
     const hdr = scr.shape(x, y, cw, HDR, { capRight:true, color:g.color });
     scr.onTap(hdr, () => navigate(g.id));
     const t1 = scr.text(x + 0.5, y, cw - 2, HDR, g.label, { fs:'sub', color:'black', weight:600 });
@@ -152,8 +168,9 @@ function renderMain(scr, W, H) {
     body.innerHTML = `<div class="clb">${clusterBody(g.id)}</div>`;
   });
 
-  /* --- superfluous-but-in-place: CORE bars drift like a live gauge --- */
+  /* --- CORE gauge drift: mock-mode only — real Fred data needs no acting --- */
   later(() => {
+    if (HA.connected) return;
     DATA.core.cpu = Math.max(8, Math.min(96, DATA.core.cpu + (Math.random()*8 - 4)));
     DATA.core.mem = Math.max(30, Math.min(92, DATA.core.mem + (Math.random()*4 - 2)));
     const c = document.getElementById('cpu-i'), m = document.getElementById('mem-i');
@@ -171,14 +188,18 @@ function clusterBody(id) {
       <div class="cam" data-n="BACKYARD"><i class="scan"></i></div>
       <div class="cam" data-n="DOWNSTAIRS"><i class="scan"></i></div></div>
       MOTION <span class="v">ARMED</span> · SIRENS <span class="v">STANDBY</span>`;
-    case 'climate': return `CONDITION <span class="v">CLEAR</span><br>HUMIDITY <span class="v">44%</span><br>SUNSET <span class="v">20:31</span> · UV <span class="v">3</span>`;
-    case 'media': return `DOWNSTAIRS <span class="v">VOL 6</span><br>EVERYWHERE <span class="v">STANDBY</span><br>ANNOUNCE <span class="v">READY</span>`;
+    case 'climate': return `CONDITION <span class="v">${DATA.climate.condition}</span><br>HUMIDITY <span class="v">${DATA.climate.humidity}%</span><br>SUNSET <span class="v">${DATA.climate.sunset}</span> · WIND <span class="v">${DATA.climate.wind} MPH</span>`;
+    case 'media': return DATA.media.slice(0, 3).map(([n, s, v]) =>
+      `${n} <span class="v">${s === 'playing' ? 'VOL ' + v : s.toUpperCase()}</span>`).join('<br>');
     case 'home': return `14:00 <span class="v">STANDUP</span><br>18:30 <span class="v">FILM SESSION</span><br>LITTER ROBOT <span class="v">CYCLED 12:40</span>`;
     case 'core': { const cpu = Math.round(DATA.core.cpu), mem = Math.round(DATA.core.mem);
+      const memShow = DATA.core.memLabel ?? mem;
+      const alarms = DATA.core.alarms === '0'
+        ? '<span class="v">CLEAR</span>' : `<span class="w">${DATA.core.alarms}</span>`;
       return `
-      <div class="mb"><div class="k">CPU</div><div class="t"><i id="cpu-i" style="width:${cpu}%;background:#ff9966;transition:width 1.2s"></i></div><div class="n" id="cpu-n">${cpu}</div></div>
-      <div class="mb"><div class="k">MEM</div><div class="t"><i id="mem-i" style="width:${mem}%;background:#ff9966;transition:width 1.2s"></i></div><div class="n" id="mem-n">${mem}</div></div>
-      WAN <span class="v">ONLINE</span> · ALARMS <span class="w">1</span>`; }
+      <div class="mb"><div class="k">CPU</div><div class="t"><i id="cpu-i" style="width:${cpu}%;background:var(--c-peach);transition:width 1.2s"></i></div><div class="n" id="cpu-n">${cpu}</div></div>
+      <div class="mb"><div class="k">MEM</div><div class="t"><i id="mem-i" style="width:${mem}%;background:var(--c-peach);transition:width 1.2s"></i></div><div class="n" id="mem-n" style="width:calc(var(--u)*2.6)">${memShow}</div></div>
+      WAN <span class="v">ONLINE</span> · ALARMS ${alarms}`; }
   }
 }
 
@@ -346,10 +367,10 @@ function buildDimmers(panel, idxs) {
   });
 }
 
-const btns = (scr, panel, items) => {   // stacked workspace buttons, category-colored
+const btns = (scr, panel, items) => {   // items: [color, text, action?] — action fires a real service call
   panel.innerHTML = `<div class="btncol">` + items.map(([c, t]) =>
     `<div class="wbtn" style="background:var(--c-${c})">${t}</div>`).join('') + `</div>`;
-  panel.querySelectorAll('.wbtn').forEach(b => scr.onTap(b, () => {}));  // Phase 2: service calls
+  panel.querySelectorAll('.wbtn').forEach((b, i) => scr.onTap(b, items[i][2] ?? (() => {})));
 };
 
 function renderWorkspace(scr, g, view, x0, y0, x1, y1) {
@@ -361,8 +382,12 @@ function renderWorkspace(scr, g, view, x0, y0, x1, y1) {
     case 'lights:ALL': {
       const [dim, sw, st] = cols([['canary','DIMMERS'], ['peach','SWITCHES'], ['lilac','STATUS']]);
       buildDimmers(dim, [0, 1, 2, 3]);
-      btns(scr, sw, [['canary','BACKYARD FLOOD'], ['peri','ALL OFF'], ['lilac','SCENE · EVENING']]);
-      st.innerHTML = `<div class="clb">ACTIVE FIXTURES <span class="v">3 / 5</span><br>
+      /* BACKYARD FLOOD = the first REAL control: light.toggle on a physical device */
+      btns(scr, sw, [
+        ['canary', 'BACKYARD FLOOD · ' + (DATA.floodOn ? 'ON' : 'OFF'),
+          () => HA.call('light', 'toggle', { entity_id:'light.backyard_light' })],
+        ['peri','ALL OFF'], ['lilac','SCENE · EVENING']]);
+      st.innerHTML = `<div class="clb">BACKYARD FLOOD <span class="v">${DATA.floodOn ? 'ON' : 'OFF'}</span><br>
         POWER DRAW <span class="v">142 W</span><br>LAST EVENT <span class="v">KITCHEN 90%</span></div>`;
       break; }
     case 'lights:INTERIOR': {
@@ -397,8 +422,13 @@ function renderWorkspace(scr, g, view, x0, y0, x1, y1) {
       btns(scr, si, [['salmon','SIREN · DOWNSTAIRS'], ['salmon','SIREN · BACKYARD'], ['canary','FLOOD · DETERRENT']]);
       break; }
     case 'security:ALERTS': {
-      const [al, log] = cols([['salmon','ALERT CONDITION'], ['lilac','EVENT LOG']]);
-      btns(scr, al, [['salmon','◤ RED ALERT'], ['gold','YELLOW ALERT'], ['peri','STAND DOWN']]);
+      const [al, log] = cols([['salmon','ALERT CONDITION · ' + alertLabel()], ['lilac','EVENT LOG']]);
+      /* real: sets input_select.lcards_alert_mode → recolors the LCARdS UI too */
+      const setAlert = opt => () => HA.call('input_select', 'select_option',
+        { entity_id:'input_select.lcards_alert_mode', option: opt });
+      btns(scr, al, [['salmon','◤ RED ALERT', setAlert('red_alert')],
+        ['gold','YELLOW ALERT', setAlert('yellow_alert')],
+        ['peri','STAND DOWN', setAlert('green_alert')]]);
       log.innerHTML = `<div class="clb">19:42 <span class="v">MOTION · BACKYARD</span><br>
         18:22 <span class="v">MOTION · FRONT DOOR</span><br>12:05 <span class="v">MOTION · DOWNSTAIRS</span><br>
         07:14 <span class="v">CONDITION GREEN · AUTO</span></div>`;
@@ -407,11 +437,12 @@ function renderWorkspace(scr, g, view, x0, y0, x1, y1) {
     /* ---------------- CLIMATE ---------------- */
     case 'climate:CURRENT': {
       const [now, sun] = cols([['lilac','ATMOSPHERIC · CURRENT'], ['peri','SOLAR']]);
-      now.innerHTML = `<div class="clb"><span class="bigval">71°F</span><br><br>
-        CONDITION <span class="v">CLEAR</span> · HUMIDITY <span class="v">44%</span><br>
-        WIND <span class="v">4 MPH NW</span> · UV <span class="v">3</span></div>`;
-      sun.innerHTML = `<div class="clb">SUNRISE <span class="v">05:48</span><br>SUNSET <span class="v">20:31</span><br>
-        MOON <span class="v">WANING GIBBOUS</span><br>DAYLIGHT <span class="v">14H 43M</span></div>`;
+      const c = DATA.climate;
+      now.innerHTML = `<div class="clb"><span class="bigval">${c.temp}°F</span><br><br>
+        CONDITION <span class="v">${c.condition}</span> · HUMIDITY <span class="v">${c.humidity}%</span><br>
+        WIND <span class="v">${c.wind} MPH</span></div>`;
+      sun.innerHTML = `<div class="clb">SUNRISE <span class="v">${c.sunrise}</span><br>SUNSET <span class="v">${c.sunset}</span><br>
+        MOON <span class="v">WANING GIBBOUS</span></div>`;
       break; }
     case 'climate:FORECAST': {
       const [fc] = cols([['lilac','5-DAY FORECAST']]);
@@ -425,10 +456,10 @@ function renderWorkspace(scr, g, view, x0, y0, x1, y1) {
     /* ---------------- MEDIA ---------------- */
     case 'media:PLAYERS': {
       const [pl] = cols([['magenta','AUDIO PLAYERS']]);
-      pl.innerHTML = `<div class="clb">` + [['DOWNSTAIRS','IDLE',6], ['EVERYWHERE','STANDBY',5], ['BEDROOM · P','STANDBY',4], ['IZZY’S ROOM','STANDBY',3]]
+      pl.innerHTML = `<div class="clb">` + DATA.media
         .map(([n, s, v]) => `<div class="mb"><div class="k" style="width:calc(var(--u)*6)">${n}</div>
           <div class="t"><i style="width:${v * 9}%"></i></div><div class="n">${v}</div>
-          <div style="width:calc(var(--u)*4);text-align:right;color:var(--c-orange)">${s}</div></div>`).join('') + `</div>`;
+          <div style="width:calc(var(--u)*4);text-align:right;color:var(--c-orange)">${s.toUpperCase()}</div></div>`).join('') + `</div>`;
       break; }
     case 'media:ANNOUNCE': {
       const [an, st] = cols([['magenta','SHIP-WIDE ANNOUNCE'], ['lilac','VOICE']]);
@@ -502,7 +533,9 @@ function renderWorkspace(scr, g, view, x0, y0, x1, y1) {
    order. ~2.8s total. ANY TAP SKIPS to the finished state (kiosk-friendly).
    Geometry-driven delays: every placed element carries data-ux/uy from the
    grid engine, so choreography needs no per-element tagging. */
+let bootUntil = 0;   // HA's first full render waits for the boot to finish
 function playBoot(scr) {
+  bootUntil = performance.now() + 3400;
   const anims = [];
   const uh = scr.uh;
   const delayFor = el => {
@@ -545,6 +578,7 @@ function playBoot(scr) {
   let finished = false;
   function finish() {                          // also the skip target
     if (finished) return; finished = true;
+    bootUntil = performance.now();             // unblock any waiting live render
     typers.forEach(clearInterval);
     anims.forEach(a => a.finish());
     ov.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 350, fill: 'forwards' })
@@ -624,6 +658,25 @@ function workspaceStandby(scr, x0, y0, x1, y1, g, msg) {
     <div style="opacity:.6;margin-top:.6em">${msg ?? 'WORKSPACE PENDING · CONTENT BUILD SCHEDULED'}</div></div>`;
   scr.breathe(p.querySelector('.standby'), { soft:true });
 }
+
+/* ---- cheap live patches (no re-render): always-visible ids only.
+   Everything else refreshes naturally — navigation re-renders constantly. */
+function patchLive() {
+  const c = document.getElementById('cpu-i'), m = document.getElementById('mem-i');
+  if (c) { c.style.width = DATA.core.cpu + '%'; document.getElementById('cpu-n').textContent = Math.round(DATA.core.cpu); }
+  if (m) { m.style.width = DATA.core.mem + '%'; document.getElementById('mem-n').textContent = DATA.core.memLabel ?? Math.round(DATA.core.mem); }
+}
+
+/* ---- HA hookup: full render once live data lands (after boot finishes),
+   targeted patches for every state_changed after that ---- */
+HA.init(DATA,
+  full => {
+    if (full) setTimeout(render, Math.max(0, bootUntil - performance.now()));
+    else patchLive();
+  },
+  () => {                                       // connection status flip → re-render chrome
+    if (performance.now() > bootUntil) render();
+  });
 
 render();
 addEventListener('resize', () => render());

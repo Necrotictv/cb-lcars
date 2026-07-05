@@ -416,3 +416,15 @@ dist/cb-lcars.js.LICENSE.txt
 dist/cb-lcars.js.map
 todo.txt
 src/TODO:.md
+
+# Async inbox — never commit
+inbox.md
+
+# Secrets — never commit
+secrets.yaml
+
+# Dashboard version snapshots (configs + screenshots) — local only for now
+dashboard_versions/
+
+# LaForge local config (HA token) - NEVER commit
+laforge/config.local.js
