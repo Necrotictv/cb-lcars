@@ -61,6 +61,27 @@ available as further category hues, used sparingly.
 
 Surfaces: `ebony-clay` = panel background; `black` = screen bg + seams.
 
+### Canonical named colors — reference (thelcars.com, harvested 2026-07-04)
+Authenticity source: the pure-CSS LCARS template's curated palette. Color VALUES only
+(colors aren't copyrightable; we don't copy their CSS). Available in the renderer as
+the **`classic`** palette. Full table for future role assignments:
+
+| name | hex | | name | hex | | name | hex |
+|---|---|---|---|---|---|---|---|
+| african-violet | #c9f | | gray | #668 | | peach | #f86 |
+| almond | #ffaa90 | | green | #993 | | red | #cf4f4f |
+| almond-creme | #fba | | ice | #9cf | | sky | #aaf |
+| blue | #56f | | lilac | #c5f | | space-white | #f5f6fa |
+| bluey | #89f | | lima-bean | #cc6 | | sunflower | #fc9 |
+| butterscotch | #f96 | | magenta | #cf5e9e | | sunglow | #fc3 |
+| gold | #fa0 | | mars | #f20 | | tomato | #f55 |
+| golden-orange | #f90 | | moonlit-violet | #96f | | violet-creme | #dbf |
+| orange | #f80 | | | | | | |
+
+Validation notes: their `butterscotch` ≈ our sampled peach ✓; their `red` ≈ our salmon ✓;
+their violets are MORE SATURATED than our video-sampled lilac/peri (compressed frames
+mute saturation) — trust the classic values when in doubt.
+
 ## 4. The Invisible Grid — LOCKED (2026-07-03, Patrick)
 LCARS conforms to an invisible grid; every UI element aligns to it. Formalized:
 

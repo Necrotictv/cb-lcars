@@ -26,6 +26,11 @@ const LCARS = (() => {
   const PALETTES = {
     tng: { peach:'#ff9966', lilac:'#cc99cc', peri:'#9999cc', gold:'#ffcc66',
            salmon:'#cc6666', canary:'#f3f08b', magenta:'#cc6699', orange:'#ff9c00' },
+    /* "classic" = thelcars.com canonical values (authenticity reference,
+       2026-07-04). Punchier violets than our video-sampled tng — their colors
+       come from screen-accurate curation, ours from compressed frames. */
+    classic: { peach:'#f86', lilac:'#c9f', peri:'#89f', gold:'#fc9',
+               salmon:'#cf4f4f', canary:'#fc3', magenta:'#cf5e9e', orange:'#f90' },
     ds9: { peach:'#ffaa55', lilac:'#bb8877', peri:'#8899bb', gold:'#ffbb33',
            salmon:'#bb5544', canary:'#ddcc77', magenta:'#aa6688', orange:'#ff9900' },
     voy: { peach:'#ffb380', lilac:'#b0a0dd', peri:'#7f96d4', gold:'#e6c97a',

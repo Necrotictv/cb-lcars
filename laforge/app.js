@@ -278,7 +278,8 @@ function renderSystems(scr, W, H) {
   const px0 = panel(0, 'peach', 'COLOR PALETTE');
   scr.panel(px0, y0 + 1.35, w3, y1 - y0 - 1.35);
   const activePal = LCARS.settings.get('palette', 'tng');
-  [['tng','TNG · GALAXY'], ['ds9','DS9 · CARDASSIAN'], ['voy','VOY · INTREPID']].forEach(([id, label], i) => {
+  [['tng','TNG · GALAXY'], ['classic','TNG · CLASSIC'],
+   ['ds9','DS9 · CARDASSIAN'], ['voy','VOY · INTREPID']].forEach(([id, label], i) => {
     const b = scr.button(px0 + 1, y0 + 2.25 + i * 2.5, w3 - 2, label,
       { color: id === activePal ? 'peach' : 'lilac', on: id === activePal, ends:'pill' });
     scr.onTap(b, () => { LCARS.settings.set('palette', id); LCARS.setPalette(id); render(); });
