@@ -167,7 +167,9 @@ const LCARS = (() => {
 
       const fill = COLORS[c.color] ?? c.color ?? COLORS.gold;
       const d = scr.place(x, y, w, h);
-      d.innerHTML = `<svg width="${Wpx}" height="${Hpx}" viewBox="0 0 ${Wpx} ${Hpx}" preserveAspectRatio="none"><path d="${p.join(' ')}" fill="${fill}"/></svg>`;
+      /* display:block — inline SVG sits on the text baseline and renders a few
+         px LOW (caught on the divider end cap). Block = exact slot fit. */
+      d.innerHTML = `<svg width="${Wpx}" height="${Hpx}" viewBox="0 0 ${Wpx} ${Hpx}" preserveAspectRatio="none" style="display:block"><path d="${p.join(' ')}" fill="${fill}"/></svg>`;
       return d;
     };
 
@@ -184,7 +186,7 @@ const LCARS = (() => {
         ? `M0 ${P(h)} L${P(tv)} ${P(h)} L${P(tv)} ${P(th+ri)} Q${P(tv)} ${P(th)} ${P(tv+ri)} ${P(th)} L${P(w)} ${P(th)} L${P(w)} 0 L${P(ro)} 0 Q0 0 0 ${P(ro)} Z`
         : `M0 0 L${P(tv)} 0 L${P(tv)} ${P(h-th-ri)} Q${P(tv)} ${P(h-th)} ${P(tv+ri)} ${P(h-th)} L${P(w)} ${P(h-th)} L${P(w)} ${P(h)} L${P(ro)} ${P(h)} Q0 ${P(h)} 0 ${P(h-ro)} Z`;
       const d = scr.place(x, y, w, h);
-      d.innerHTML = `<svg width="${U(w)}" height="${U(h)}" viewBox="0 0 ${U(w)} ${U(h)}"><path d="${path}" fill="${COLORS[color] ?? color}"/></svg>`;
+      d.innerHTML = `<svg width="${U(w)}" height="${U(h)}" viewBox="0 0 ${U(w)} ${U(h)}" style="display:block"><path d="${path}" fill="${COLORS[color] ?? color}"/></svg>`;
       return d;
     };
 
