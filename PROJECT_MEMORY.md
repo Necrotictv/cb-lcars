@@ -4,6 +4,10 @@ broadcasts_applied_through: 2026-06-25
 
 # PROJECT_MEMORY — LCARS-HA-Web · **Project LaForge**
 
+> **⚠ MODEL HANDOFF IN EFFECT (2026-07-06): read `HANDOFF.md` FIRST.** It is the
+> successor primer — current state, locked decisions, gotchas, protection rules.
+> Milestone tag `v1.0-fable` = guaranteed-good state; revert = `git reset --hard v1.0-fable`.
+
 > **Codename applied 2026-07-03:** the custom-renderer build (tier-3 custom card path) is named
 > **Project_LaForge**. Folder/repo names unchanged (still `LCARS-HA-Web`) — rename is a separate
 > decision if Patrick wants it.
