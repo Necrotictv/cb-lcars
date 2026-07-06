@@ -68,6 +68,9 @@ addEventListener('keydown', e => {
 
 function render() {
   timers.forEach(clearInterval); timers = [];
+  /* teardown: destroy the Cesium viewer BEFORE wiping its DOM — otherwise
+     each re-render leaks a WebGL context (fatal on the HD 520 kiosk) */
+  if (geoViewer) { try { geoViewer.destroy(); } catch {} geoViewer = null; }
   root.innerHTML = '';
   const u = root.clientWidth / UNITS_WIDE;
   document.documentElement.style.setProperty('--u', u + 'px');
@@ -408,6 +411,8 @@ function moonPhase() {
     toFull: ((0.5 - f + 1) % 1) * syn, toNew: ((1 - f) % 1) * syn };
 }
 
+let geoViewer = null;   // live Cesium viewer ref (search flyTo without re-render)
+
 /* lazy CDN loader — Cesium (~10MB) must not load until GEO opens (HD 520 kiosk) */
 const loaded = {};
 function loadScript(src, cssHref) {
@@ -438,6 +443,29 @@ function viewscreen(title, contentHTML) {
 }
 
 const homeGeo = () => DATA.geo ?? { lat: 39.1, lon: -84.5 };   // zone.home via ha.js
+
+/* geocoding: Nominatim (OpenStreetMap) — free, no key, fair-use rate.
+   Returns {lat, lon, name} or null. Kiosk note: touch keyboard pops on focus. */
+async function geocode(q) {
+  try {
+    const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(q));
+    const j = await r.json();
+    if (!j[0]) return null;
+    return { lat: +j[0].lat, lon: +j[0].lon, name: j[0].display_name.split(',')[0].toUpperCase() };
+  } catch { return null; }
+}
+/* LCARS sensor-target input: appends to host, calls onGo(query) on Enter/SCAN */
+function searchBox(host, placeholder, onGo) {
+  const d = document.createElement('div');
+  d.className = 'lsearch';
+  d.innerHTML = `<input placeholder="${placeholder}" spellcheck="false"><div class="go">SCAN</div>`;
+  host.appendChild(d);
+  const input = d.querySelector('input');
+  const fire = () => { const q = input.value.trim(); if (q) onGo(q); };
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') fire(); });
+  d.querySelector('.go').addEventListener('pointerup', fire);
+  return d;
+}
 
 function renderWorkspace(scr, g, view, x0, y0, x1, y1) {
   const key = g.id + ':' + ((g.local ?? [])[view] ?? '');
@@ -523,9 +551,21 @@ function renderWorkspace(scr, g, view, x0, y0, x1, y1) {
       mapP.innerHTML = `<div class="feed"><iframe src="https://embed.windy.com/embed2.html?lat=${geo.lat}&lon=${geo.lon}&detailLat=${geo.lat}&detailLon=${geo.lon}&zoom=8&level=surface&overlay=radar&product=radar&menu=&message=&marker=&calendar=now&type=map&location=coordinates&metricWind=mph&metricTemp=%C2%B0F&radarRange=-1" loading="lazy"></iframe></div>`;
       const dx = x0 + wMap + GAP;
       const [ro] = wsCols(scr, dx, y0, x1, y1, [['peri','READOUT']]);
-      ro.innerHTML = `<div class="clb">OVERLAY <span class="v">RADAR</span><br>
+      ro.innerHTML = `<div class="clb">TARGET <span class="v" id="survey-target">RESIDENCE</span><br>
+        OVERLAY <span class="v">RADAR</span><br>
         HUMIDITY <span class="v">${DATA.climate.humidity}%</span><br>WIND <span class="v">${DATA.climate.wind} MPH</span><br>
-        CONDITION <span class="v">${DATA.climate.condition}</span></div>`;
+        CONDITION <span class="v">${DATA.climate.condition}</span>
+        <span id="survey-status" class="w"></span></div>`;
+      /* sensor retarget: geocode → rebuild the Windy iframe at the new coords */
+      searchBox(ro.querySelector('.clb'), 'SENSOR TARGET…', async q => {
+        document.getElementById('survey-status').textContent = ' SCANNING…';
+        const g = await geocode(q);
+        document.getElementById('survey-status').textContent = g ? '' : ' NO CONTACT';
+        if (!g) return;
+        document.getElementById('survey-target').textContent = g.name;
+        mapP.querySelector('iframe').src =
+          `https://embed.windy.com/embed2.html?lat=${g.lat}&lon=${g.lon}&detailLat=${g.lat}&detailLon=${g.lon}&zoom=8&level=surface&overlay=radar&product=radar&menu=&message=&marker=&calendar=now&type=map&location=coordinates&metricWind=mph&metricTemp=%C2%B0F&radarRange=-1`;
+      });
       break; }
 
     case 'science:ORBITAL': {
@@ -580,7 +620,7 @@ function renderWorkspace(scr, g, view, x0, y0, x1, y1) {
           host.innerHTML = '';
           const imagery = await Cesium.ArcGisMapServerImageryProvider.fromUrl(
             'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer');
-          const viewer = new Cesium.Viewer(host, {
+          const viewer = geoViewer = new Cesium.Viewer(host, {
             baseLayer: new Cesium.ImageryLayer(imagery),
             baseLayerPicker:false, geocoder:false, timeline:false, animation:false,
             homeButton:false, sceneModePicker:false, navigationHelpButton:false,
@@ -598,9 +638,23 @@ function renderWorkspace(scr, g, view, x0, y0, x1, y1) {
         });
       const dx = x0 + wMap + GAP;
       const [tg] = wsCols(scr, dx, y0, x1, y1, [['peri','TARGETING']]);
-      tg.innerHTML = `<div class="clb">TARGET <span class="v">RESIDENCE</span><br>
-        LAT <span class="v">${geo.lat.toFixed(3)}</span><br>LON <span class="v">${geo.lon.toFixed(3)}</span><br>
-        LIGHTING <span class="v">DAY/NIGHT LIVE</span></div>`;
+      tg.innerHTML = `<div class="clb">TARGET <span class="v" id="geo-target">RESIDENCE</span><br>
+        LAT <span class="v" id="geo-lat">${geo.lat.toFixed(3)}</span><br>
+        LON <span class="v" id="geo-lon">${geo.lon.toFixed(3)}</span><br>
+        LIGHTING <span class="v">DAY/NIGHT LIVE</span>
+        <span id="geo-status" class="w"></span></div>`;
+      /* sensor retarget: geocode → fly the globe there in place (no re-render,
+         the Cesium viewer survives; flyTo triggers renders in requestRenderMode) */
+      searchBox(tg.querySelector('.clb'), 'SENSOR TARGET…', async q => {
+        document.getElementById('geo-status').textContent = ' SCANNING…';
+        const g = await geocode(q);
+        document.getElementById('geo-status').textContent = g ? '' : ' NO CONTACT';
+        if (!g || !geoViewer) return;
+        document.getElementById('geo-target').textContent = g.name;
+        document.getElementById('geo-lat').textContent = g.lat.toFixed(3);
+        document.getElementById('geo-lon').textContent = g.lon.toFixed(3);
+        geoViewer.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(g.lon, g.lat, 400000) });
+      });
       break; }
 
     /* ---------------- MEDIA ---------------- */

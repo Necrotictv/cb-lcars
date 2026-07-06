@@ -98,6 +98,17 @@
   @keyframes fbspin{0%,100%{opacity:.9}50%{opacity:.3}}
   .saver-clk{font-family:Antonio;font-size:calc(var(--u)*0.7);color:var(--c-gold,#ffcc66);letter-spacing:.25em}
 
+  /* LCARS sensor-target search: black field, orange entry text, SCAN pill */
+  .lsearch{display:flex;gap:calc(var(--u)*0.3);margin:calc(var(--u)*0.4) 0;align-items:stretch}
+  .lsearch input{flex:1;background:#0a0c12;border:1px solid var(--c-peri,#9999cc);
+    border-radius:calc(var(--u)*0.25);color:var(--c-orange,#ff9c00);font-family:Antonio;
+    font-size:calc(var(--u)*0.5);letter-spacing:.08em;padding:calc(var(--u)*0.25) calc(var(--u)*0.4);
+    text-transform:uppercase;outline:none;min-width:0}
+  .lsearch input::placeholder{color:var(--c-peri,#9999cc);opacity:.6}
+  .lsearch .go{background:var(--c-lilac,#cc99cc);color:#000;border-radius:calc(var(--u)*0.5);
+    display:flex;align-items:center;padding:0 calc(var(--u)*0.6);font-family:Antonio;
+    font-size:calc(var(--u)*0.5);font-weight:600;letter-spacing:.1em;cursor:pointer}
+
   /* workspace switch buttons */
   .btncol{display:flex;flex-direction:column;gap:calc(var(--u)*0.5);padding:calc(var(--u)*0.6)}
   .wbtn{height:calc(var(--u)*1.8);border-radius:calc(var(--u)*0.9);color:#000;
@@ -110,9 +121,9 @@
 <!-- config.local.js is GITIGNORED (HA token); absent = simulated mode.
      ?v= version query = cache-bust (bump when shipping to the kiosk/Fred) -->
 <script src="config.local.js" onerror="console.warn('[LaForge] no local config — simulated mode')"></script>
-<script src="lcars.js?v=5"></script>
-<script src="floorplan.js?v=5"></script>
-<script src="ha.js?v=5"></script>
-<script src="app.js?v=5"></script>
+<script src="lcars.js?v=7"></script>
+<script src="floorplan.js?v=7"></script>
+<script src="ha.js?v=7"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>

@@ -159,6 +159,35 @@ tiers verified live 2026-07-04).
    on demand.
 4. Coordinates come from HA `zone.home` (mock used guessed Cincinnati coords).
 
+### HOLODECK SPOKE (proposed name — Patrick's "prop spoke", captured 2026-07-04)
+**Status: BLUE SKY — build AFTER functional pieces. This section is the idea vault.**
+Authentic LCARS consoles + displays that are interactive **for fun** — theatric, not
+functional. May trigger REAL room effects (HA lighting routines, audio, IoT props)
+but control nothing that matters. The room becomes the set.
+
+**Console concepts (Patrick's list):**
+- **TRANSPORTER ROOM** — pad console; energize dims the room lights, runs a
+  transporter color routine on the RGB fixtures, plays the shimmer audio.
+- **SHIP MSDs** — interactive cutaway diagrams: Enterprise-D, Defiant, Excelsior,
+  DS9, Voyager. Tap systems for status readouts/flavor.
+- **MAIN ENGINEERING / WARP CORE** — the crown jewel. Interactive core with:
+  eject core / recover core, matter–antimatter flow adjustment, dilithium matrix
+  realignment, warp plasma venting.
+  **CORE BREACH GAME:** button press → random situation + countdown timer → perform
+  the CORRECT action sequence or "lose the ship." Full room lights + sound design.
+  IoT props for physical effects — e.g., a vapor blast = coolant leak.
+- **CONN / FLIGHT CONTROLS** — helm console, course plotting theater.
+- **TACTICAL / WEAPONS** — phaser/torpedo console, lock + fire theater.
+
+**Architecture notes (so future-us starts smart):**
+- Each console = a workspace under the HOLODECK spoke; room effects = HA scenes +
+  scripts triggered via the existing HA.call() path (lights/audio already wired).
+- The breach game = state machine + countdown (boot-sequence timing patterns reuse).
+- Audio: sound-pack hooks already stubbed (SYSTEMS → beeps/ambient flags).
+- MSD ship diagrams: SVG cutaways, same okudagram language as the house MSD.
+- 7th cluster on main = the grid decision (or HOLODECK lives behind a rail button
+  like SYSTEMS, keeping the 3×2 sacred — probably THE answer: it's not home ops).
+
 ### Future spokes (post-v1, layout decision needed — 7th cluster changes the 3×2 grid)
 - **ASTROMETRICS** (chetwode?) — star maps / solar system embeds, flight radar, traffic cams
 - SYSTEMS is NOT a spoke — it's terminal chrome (rail button), config only.
