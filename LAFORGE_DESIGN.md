@@ -159,6 +159,28 @@ tiers verified live 2026-07-04).
    on demand.
 4. Coordinates come from HA `zone.home` (mock used guessed Cincinnati coords).
 
+### ENVIRONMENTAL SPOKE (Patrick, 2026-07-09 — LOGGED, NOT YET BUILT)
+**The plan:** LIGHTS is absorbed into a new **ENVIRONMENTAL** spoke (canary, same
+cluster slot — the sacred 3×2 survives). Thematic split: **SCIENCE observes the
+environment, ENVIRONMENTAL controls it.** Canon rationale: starships have
+Environmental Control; they don't have a "lights station."
+
+**Views (4 pills):**
+- **LIGHTING** — the current LIGHTS·ALL workspace (dimmers, switches, flood)
+- **ATMOSPHERE** — AC/heat/thermostat control (STANDBY until climate entities exist)
+  + COLD STORAGE live (refrigerator fridge/freezer temps — real sensors, life-support
+  flavor)
+- **SHUTTERS** — blinds/covers (STANDBY until cover.* entities exist)
+- **SCENES** — lighting/environment scenes (needs HA scenes — Patrick side)
+
+**Functionality migration:** LIGHTS spoke retires (all content → LIGHTING view);
+future thermostat that would have gone to SCIENCE·ATMOS goes HERE instead (ATMOS
+stays weather-observation only); fridge temps leave CORE flavor for ATMOSPHERE.
+Badge: lights-on count (later: inside temp once a thermostat exists).
+Implementation note: ~30-minute change (GROUPS entry, badge key, clusterBody case,
+4 workspace cases) — a first pass was built and cleanly reverted 2026-07-09
+(Patrick: log only for now); this section is the spec for when he green-lights it.
+
 ### HOLODECK SPOKE (proposed name — Patrick's "prop spoke", captured 2026-07-04)
 **Status: BLUE SKY — build AFTER functional pieces. This section is the idea vault.**
 Authentic LCARS consoles + displays that are interactive **for fun** — theatric, not

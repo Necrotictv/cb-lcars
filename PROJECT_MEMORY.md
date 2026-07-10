@@ -386,6 +386,43 @@ adding real devices (TP-Link/Tuya) + the floor plan himself later tonight.
   popup** (viewscreen treatment). Embed rule: 3 tiers, native > JS lib > sanctioned
   iframe w/ bezel; NO new tabs ever. Coords from HA zone.home (mock guessed Cincinnati).
   Mock: laforge/science_mock.html (4 views switchable).
+- **CAMERA LIVE FEEDS (commit 49e2669, 2026-07-09) — hardest roadmap item DONE:**
+  `HA.signPath()` (auth/sign_path ws command) mints short-lived signed camera_proxy
+  URLs — the standard answer to "img tags can't send Bearer tokens." SECURITY·CAMERAS =
+  3 live panels @5s + live activity stamps + tap→viewscreen popup @2s (interval cleaned
+  by viewscreen's new onClose hook). Main SECURITY cluster thumbs @10s. VERIFIED all
+  3 cameras at 1920×1080. Upgrade path noted: HLS via `camera/stream` ws command +
+  hls.js if stills feel choppy on the kiosk (stills chosen first: robust, cheap).
+  NOTE: dev server on port 8000 does NOT survive Zeke reboots — restart per HANDOFF
+  runbook (symptom: page loads but title is 'localhost', no scripts defined).
+- **UI FUNCTIONALITY SPRINT (2026-07-09, commits 29b2e8f + ab54194):**
+  MSD ROOM POPUPS — floor-plan rooms are tap targets → live entity panel (per-domain:
+  TOGGLE for light/switch, 2-tap CONFIRM for sirens, OPEN FEED chains to camera
+  viewscreen, volume readouts; wildcards expand from HA.states). VERIFIED (DOWNSTAIRS).
+  REAL 5-DAY FORECAST — ha.js fetchForecast() via weather.get_forecasts +
+  return_response (attributes removed in modern HA), condition→LCARS label map,
+  30-min refresh. LIVE cats/litter (HOME·ROUTINES, numeric states rounded) +
+  update.* enumeration (CORE·UPDATES, 19 entities).
+  ON_FEELING.md written at Patrick's request (re: HANDOFF's closing line).
+  **DEPLOYMENT ORDER (Patrick):** UI functionality first → THEN Fred deploy.
+  Post-deploy backlog: real floor-plan layout (Sweet Home 3D), Majel voice, HOLODECK.
+  Remaining pre-deploy UI: interactive MEDIA volume sliders, LIGHTS scenes (needs HA
+  scenes — Patrick side), general polish pass.
+- **VIEWSCREEN POPUP RESKIN (commit f2578da) — UI_STANDARDS §9 LOCKED:** popups are
+  TRUE LCARS mini-frames per Patrick's Stellar Cartography reference (1.25u segmented
+  rail, 0.9u title bar, 0.5u bottom bar, 1u outer sweeps, 0.5u concave webs, open right
+  side, salmon cap CLOSE). Context colors: salmon=security, peri=rooms, lilac=science.
+  Palette-role based → alerts recolor open popups. VERIFIED on live night cam feed.
+- **ENVIRONMENTAL SPOKE LOGGED, NOT BUILT (2026-07-09):** Patrick wants LIGHTS absorbed
+  into ENVIRONMENTAL (AC, room lighting, blinds — actuation; SCIENCE keeps observation).
+  Full spec in LAFORGE_DESIGN. A first-pass implementation was built then CLEANLY
+  REVERTED on his "log it, don't do it yet" (git-verified byte-identical). Build on
+  his green-light only.
+- **SESSION PAUSE (2026-07-09, Patrick at limit).** RESUME AT: interactive MEDIA volume
+  sliders (drag → media_player.volume_set / number.set_value, reuse dimmer drag code) →
+  full shakedown pass (walk every screen/view hunting rough edges) → THEN declare
+  deployable → Fred serving-origin decision + deploy + kiosk Cesium perf test.
+  Post-deploy backlog: floor plan SVG, Majel voice, HOLODECK, sound pack.
 - **KIOSK HARDWARE (Patrick, 2026-07-04):** Surface Pro 4 — containerized/isolated
   Win10 OR compatible Linux distro. GPU = Intel HD 520 (Skylake iGPU): CesiumJS-capable
   at panel res, but budget it — `requestRenderMode:true` (render on demand), resolution
