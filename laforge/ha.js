@@ -100,6 +100,13 @@ const HA = (() => {
     const home = st('zone.home');
     if (home) D.geo = { lat: home.attributes.latitude, lon: home.attributes.longitude };
 
+    /* cameras: entity + live last-activity stamp (UTC ISO → local HH:MM) */
+    D.cams = [
+      ['FRONT DOOR', 'camera.front_door_live_view', localHM('sensor.front_door_last_activity')],
+      ['BACKYARD',   'camera.backyard_live_view',   localHM('sensor.backyard_last_activity')],
+      ['DOWNSTAIRS', 'camera.downstairs_live_view', localHM('sensor.downstairs_last_activity')],
+    ];
+
     D.media = [
       ['DOWNSTAIRS',  st('media_player.downstairs')?.state ?? 'unknown',        num('number.downstairs_volume', 6)],
       ['EVERYWHERE',  st('media_player.everywhere')?.state ?? 'unknown',        5],
@@ -115,5 +122,16 @@ const HA = (() => {
     return send({ type:'call_service', domain, service, service_data: data });
   }
 
-  return { init, call, st, num, get connected() { return connected; }, get states() { return states; } };
+  /* ---- signed camera URLs ----
+     WHY: <img> can't send Bearer headers, so HA signs a short-lived path we
+     can use as a plain src. Re-sign on every refresh (they expire fast). */
+  async function signPath(path, expires = 60) {
+    if (!connected) return null;
+    try { const r = await send({ type:'auth/sign_path', path, expires });
+      return cfg.haUrl + r.path; } catch { return null; }
+  }
+  const cameraUrl = entityId => signPath('/api/camera_proxy/' + entityId);
+
+  return { init, call, st, num, signPath, cameraUrl,
+    get connected() { return connected; }, get states() { return states; } };
 })();

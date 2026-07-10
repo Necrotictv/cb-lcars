@@ -35,6 +35,7 @@ const GROUPS = [
 /* ---- shared data object. Boots with mock values; ha.js sync() overwrites
    them with live HA state when config.local.js provides a token. ---- */
 const DATA = {
+  cams: [ ['FRONT DOOR', null, '—'], ['BACKYARD', null, '—'], ['DOWNSTAIRS', null, '—'] ],
   dimmers: [ ['LIVING',72], ['FOYER',45], ['KITCHEN',90], ['BACKYD',0] ],
   core:    { cpu:34, mem:61, alarms:'1' },
   climate: { temp:71, condition:'CLEAR', humidity:44, wind:4, sunset:'20:31', sunrise:'05:48' },
@@ -171,6 +172,17 @@ function renderMain(scr, W, H) {
     body.innerHTML = `<div class="clb">${clusterBody(g.id)}</div>`;
   });
 
+  /* --- live camera thumbnails on the SECURITY cluster (10s cadence) --- */
+  const thumbs = async () => {
+    for (let i = 0; i < DATA.cams.length; i++) {
+      const [, entity] = DATA.cams[i], img = document.getElementById('camthumb-' + i);
+      if (!entity || !img) continue;
+      const u = await HA.cameraUrl(entity);
+      if (u && img.isConnected) img.src = u;
+    }
+  };
+  thumbs(); later(thumbs, 10000);
+
   /* --- CORE gauge drift: mock-mode only — real Fred data needs no acting --- */
   later(() => {
     if (HA.connected) return;
@@ -187,9 +199,8 @@ function clusterBody(id) {
     case 'lights': return DATA.dimmers.map(([k,v]) => `
       <div class="mb"><div class="k">${k}</div><div class="t"><i style="width:${v}%"></i></div><div class="n">${v||'OFF'}</div></div>`).join('');
     case 'security': return `
-      <div class="cams"><div class="cam" data-n="FRONT DOOR"><i class="scan"></i></div>
-      <div class="cam" data-n="BACKYARD"><i class="scan"></i></div>
-      <div class="cam" data-n="DOWNSTAIRS"><i class="scan"></i></div></div>
+      <div class="cams">` + DATA.cams.map(([n], i) =>
+        `<div class="cam" data-n="${n}"><img class="camimg" id="camthumb-${i}" alt=""><i class="scan"></i></div>`).join('') + `</div>
       MOTION <span class="v">ARMED</span> · SIRENS <span class="v">STANDBY</span>`;
     case 'science': return `CONDITION <span class="v">${DATA.climate.condition}</span><br>HUMIDITY <span class="v">${DATA.climate.humidity}%</span><br>SUNSET <span class="v">${DATA.climate.sunset}</span> · LUNA <span class="v">${moonPhase().illum}%</span>`;
     case 'media': return DATA.media.slice(0, 3).map(([n, s, v]) =>
@@ -427,7 +438,7 @@ function loadScript(src, cssHref) {
 
 /* viewscreen popup: LCARS bezel + title + CLOSE — reusable (NASA Eyes now,
    camera feeds later). One at a time; ESC or CLOSE dismisses. */
-function viewscreen(title, contentHTML) {
+function viewscreen(title, contentHTML, onClose) {
   document.getElementById('vpop')?.remove();
   const v = document.createElement('div');
   v.id = 'vpop';
@@ -436,10 +447,25 @@ function viewscreen(title, contentHTML) {
     <div class="vpop-body">${contentHTML}</div></div>`;
   document.body.appendChild(v);
   v.animate([{opacity:0},{opacity:1}], {duration:180, fill:'forwards'});
-  const close = () => v.remove();
+  const close = () => { onClose?.(); v.remove(); };   // onClose: clear feed intervals etc.
   v.querySelector('.vpop-close').addEventListener('pointerup', close);
   v.addEventListener('pointerup', e => { if (e.target === v) close(); });
   return v;
+}
+
+/* live camera viewscreen: signed-URL stills on a fast refresh. Own interval,
+   cleared on close (popup outlives render() so timers[] can't own it). */
+function camPopup(name, entity) {
+  const v = viewscreen('VIEWSCREEN · ' + name + ' · LIVE FEED',
+    `<img class="campop" alt="ACQUIRING SIGNAL…">`,
+    () => clearInterval(t));
+  const img = v.querySelector('img');
+  const refresh = async () => {
+    const u = await HA.cameraUrl(entity);
+    if (u && img.isConnected) img.src = u;
+  };
+  refresh();
+  const t = setInterval(refresh, 2000);
 }
 
 const homeGeo = () => DATA.geo ?? { lat: 39.1, lon: -84.5 };   // zone.home via ha.js
@@ -505,10 +531,21 @@ function renderWorkspace(scr, g, view, x0, y0, x1, y1) {
 
     /* ---------------- SECURITY ---------------- */
     case 'security:CAMERAS': {
-      const [c1, c2, c3] = cols([['salmon','FRONT DOOR'], ['salmon','BACKYARD'], ['salmon','DOWNSTAIRS']]);
-      [c1, c2, c3].forEach((p, i) => p.innerHTML =
-        `<div class="cam" style="height:78%;margin:4%"><i class="scan"></i></div>
-         <div class="clb" style="height:auto">LAST ACTIVITY <span class="v">${['18:22','19:42','12:05'][i]}</span></div>`);
+      const panels = cols(DATA.cams.map(([n]) => ['salmon', n]));
+      panels.forEach((p, i) => {
+        const [name, entity, act] = DATA.cams[i];
+        p.innerHTML =
+          `<div class="cam" style="height:78%;margin:4%"><img class="camimg" alt=""><i class="scan"></i></div>
+           <div class="clb" style="height:auto">LAST ACTIVITY <span class="v">${act}</span>${entity ? '' : ' · <span class="w">SIM</span>'}</div>`;
+        if (!entity) return;                       // mock mode: scan line only
+        const img = p.querySelector('.camimg');
+        const refresh = async () => {              // signed still every 5s = live feed
+          const u = await HA.cameraUrl(entity);
+          if (u && img.isConnected) img.src = u;
+        };
+        refresh(); later(refresh, 5000);
+        scr.onTap(p.querySelector('.cam'), () => camPopup(name, entity));
+      });
       break; }
     case 'security:PERIMETER': {
       const [mo, si] = cols([['salmon','MOTION DETECTION'], ['peach','SIRENS · DETERRENT']]);
