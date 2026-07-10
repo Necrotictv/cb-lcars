@@ -470,6 +470,60 @@ function camPopup(name, entity) {
 
 const homeGeo = () => DATA.geo ?? { lat: 39.1, lon: -84.5 };   // zone.home via ha.js
 
+/* ============================ ROOM POPUPS (MSD) ============================
+   Tap a room on the floor plan → viewscreen with that room's entities,
+   resolved LIVE against HA states. Per-domain treatment:
+   light/switch/siren → state + TOGGLE · camera → OPEN FEED · media_player →
+   state/volume · sensors/numbers → value. Wildcards (sensor.foo_*) expand. */
+function findRoom(id) {
+  for (const d of FLOORPLAN.decks) { const r = d.rooms.find(r => r.id === id); if (r) return r; }
+  return FLOORPLAN.exterior.find(r => r.id === id);
+}
+function roomPopup(roomId) {
+  const room = findRoom(roomId);
+  if (!room) return;
+  /* expand entity list: wildcards from live states, notes passed through */
+  const ents = [];
+  for (const e of (room.entities ?? [])) {
+    if (e.startsWith('(')) ents.push({ note: e.toUpperCase() });
+    else if (e.endsWith('*')) Object.keys(HA.states)
+      .filter(k => k.startsWith(e.slice(0, -1))).slice(0, 6).forEach(k => ents.push({ id: k }));
+    else ents.push({ id: e });
+  }
+  const rows = ents.map(en => {
+    if (en.note) return `<div class="rp-row"><span style="opacity:.55">${en.note}</span></div>`;
+    const s = HA.st(en.id);
+    const name = (s?.attributes?.friendly_name ?? en.id.split('.')[1].replace(/_/g, ' ')).toUpperCase();
+    const domain = en.id.split('.')[0];
+    const state = s ? String(s.state).toUpperCase() : 'NO DATA';
+    let ctl = '';
+    if (['light', 'switch', 'siren'].includes(domain))
+      ctl = `<div class="rp-btn" data-toggle="${en.id}">TOGGLE</div>`;
+    else if (domain === 'camera')
+      ctl = `<div class="rp-btn" data-cam="${en.id}" data-name="${name}">OPEN FEED</div>`;
+    else if (domain === 'media_player' && s?.attributes?.volume_level !== undefined)
+      ctl = `<span class="v">VOL ${Math.round(s.attributes.volume_level * 100)}%</span>`;
+    return `<div class="rp-row"><span>${name}</span>
+      <span class="v">${state}${s?.attributes?.unit_of_measurement ? ' ' + s.attributes.unit_of_measurement : ''}</span>${ctl}</div>`;
+  }).join('');
+  const v = viewscreen('ROOM SYSTEMS · ' + room.label,
+    `<div class="clb rp">${rows || '<div class="rp-row">NO SYSTEMS REGISTERED</div>'}</div>`);
+  /* wire controls — sirens are REAL and LOUD: confirm before toggling one */
+  v.querySelectorAll('[data-toggle]').forEach(b => b.addEventListener('pointerup', () => {
+    const id = b.dataset.toggle;
+    if (id.startsWith('siren.') && !b.dataset.armed) {
+      b.dataset.armed = '1'; b.textContent = 'CONFIRM?'; b.style.background = 'var(--c-salmon)';
+      setTimeout(() => { if (b.isConnected) { delete b.dataset.armed; b.textContent = 'TOGGLE'; b.style.background = ''; } }, 4000);
+      return;
+    }
+    HA.call('homeassistant', 'toggle', { entity_id: id });
+    b.textContent = 'SENT';
+    setTimeout(() => { if (b.isConnected) b.textContent = 'TOGGLE'; }, 1200);
+  }));
+  v.querySelectorAll('[data-cam]').forEach(b => b.addEventListener('pointerup', () =>
+    camPopup(b.dataset.name, b.dataset.cam)));
+}
+
 /* geocoding: Nominatim (OpenStreetMap) — free, no key, fair-use rate.
    Returns {lat, lon, name} or null. Kiosk note: touch keyboard pops on focus. */
 async function geocode(q) {
@@ -722,8 +776,10 @@ function renderWorkspace(scr, g, view, x0, y0, x1, y1) {
       const p = scr.panel(x0, y0 + 1.35, x1 - x0, y1 - y0 - 1.35);
       p.style.padding = scr.U(0.5) + 'px';
       renderMSD(p, k => getComputedStyle(document.documentElement).getPropertyValue(k).trim());
-      p.querySelectorAll('[data-room]').forEach(el => el.addEventListener('pointerdown', () =>
-        el.animate([{opacity:1},{opacity:.3},{opacity:1}], {duration:220})));   // Phase 2: room popup
+      p.querySelectorAll('[data-room]').forEach(el => el.addEventListener('pointerup', () => {
+        el.animate([{opacity:1},{opacity:.3},{opacity:1}], {duration:220});
+        roomPopup(el.dataset.room);              // live entity panel for the room
+      }));
       break; }
     case 'home:CALENDAR': {
       const [today, next] = cols([['peri','TODAY'], ['lilac','UPCOMING']]);
