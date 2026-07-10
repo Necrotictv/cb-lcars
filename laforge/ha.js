@@ -55,6 +55,29 @@ const HA = (() => {
     (await send({ type:'get_states' })).forEach(s => states[s.entity_id] = s);
     await send({ type:'subscribe_events', event_type:'state_changed' });
     sync(true);                                   // one full render with real data
+    fetchForecast();                              // forecasts are a SERVICE now, not attributes
+    setInterval(fetchForecast, 30 * 60000);       // refresh every 30 min
+  }
+
+  /* ---- daily forecast: modern HA requires weather.get_forecasts with
+     return_response (forecast attributes were removed in 2024) ---- */
+  const COND = { 'sunny':'CLEAR', 'clear-night':'CLEAR', 'partlycloudy':'P/CLOUDY',
+    'cloudy':'OVERCAST', 'rainy':'RAIN', 'pouring':'HEAVY RAIN', 'fog':'FOG',
+    'lightning':'STORMS', 'lightning-rainy':'STORMS', 'snowy':'SNOW',
+    'snowy-rainy':'SLEET', 'windy':'WINDY', 'windy-variant':'WINDY', 'hail':'HAIL' };
+  async function fetchForecast() {
+    if (!connected) return;
+    try {
+      const r = await send({ type:'call_service', domain:'weather', service:'get_forecasts',
+        service_data:{ type:'daily' }, target:{ entity_id:'weather.forecast_home' },
+        return_response:true });
+      const list = r?.response?.['weather.forecast_home']?.forecast ?? [];
+      hooks.data.forecast = list.slice(0, 5).map(f => ({
+        day: new Date(f.datetime).toLocaleDateString('en-US', { weekday:'short' }).toUpperCase(),
+        cond: COND[f.condition] ?? (f.condition ?? '?').toUpperCase(),
+        hi: Math.round(f.temperature), lo: Math.round(f.templow ?? f.temperature) }));
+      hooks.onUpdate?.(false);
+    } catch (e) { console.warn('[HA] forecast fetch failed', e); }
   }
 
   function setStatus(on) { connected = on; hooks.onStatus?.(on); }

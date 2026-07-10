@@ -627,12 +627,16 @@ function renderWorkspace(scr, g, view, x0, y0, x1, y1) {
         CONDITION <span class="v">${c.condition}</span> · HUMIDITY <span class="v">${c.humidity}%</span><br>
         WIND <span class="v">${c.wind} MPH</span><br><br>
         SUNRISE <span class="v">${c.sunrise}</span> · SUNSET <span class="v">${c.sunset}</span></div>`;
-      /* forecast strip: mock until weather.get_forecasts service wired (modern
-         HA moved forecasts out of attributes — service call, Phase 2.1) */
+      /* forecast strip: LIVE via weather.get_forecasts (ha.js); mock fallback */
+      const days = DATA.forecast ?? [
+        { day:'SAT', cond:'CLEAR', hi:88, lo:66 }, { day:'SUN', cond:'P/CLOUDY', hi:84, lo:64 },
+        { day:'MON', cond:'STORMS', hi:79, lo:63 }, { day:'TUE', cond:'CLEAR', hi:82, lo:61 },
+        { day:'WED', cond:'CLEAR', hi:85, lo:63 }];
       fc.innerHTML = `<div class="clb" style="display:flex;gap:2%;align-items:stretch">` +
-        [['SAT','CLEAR',88,66], ['SUN','P/CLOUDY',84,64], ['MON','STORMS',79,63], ['TUE','CLEAR',82,61], ['WED','CLEAR',85,63]]
-        .map(([d, cc, h, l]) => `<div style="flex:1;text-align:center;border:1px solid #39415e;border-radius:4px;padding:4% 0">
-          <span class="v">${d}</span><br><br>${cc}<br><br><span class="bigval" style="font-size:calc(var(--u)*1.1)">${h}°</span><br>${l}°</div>`).join('') + `</div>`;
+        days.map(d => `<div style="flex:1;text-align:center;border:1px solid #39415e;border-radius:4px;padding:4% 0">
+          <span class="v">${d.day}</span><br><br>${d.cond}<br><br>
+          <span class="bigval" style="font-size:calc(var(--u)*1.1)">${d.hi}°</span><br>${d.lo}°</div>`).join('') +
+        `</div>` + (DATA.forecast ? '' : '<div class="clb" style="height:auto"><span class="w">SIMULATED</span></div>');
       break; }
 
     case 'science:SURVEY': {
@@ -790,9 +794,16 @@ function renderWorkspace(scr, g, view, x0, y0, x1, y1) {
     case 'home:ROUTINES': {
       const [rt, cats] = cols([['peri','ALEXA ROUTINES'], ['lilac','FELINE SYSTEMS']]);
       btns(scr, rt, [['peri','GOOD NIGHT'], ['peri','I’M HOME'], ['peri','KICK OFF MY DAY'], ['peri','SLEEPY TIME']]);
-      cats.innerHTML = `<div class="clb">MELIA <span class="v">3 VISITS · 9.2 LB</span><br>
-        PEACHY <span class="v">5 VISITS · 11.4 LB</span><br>LITTER <span class="v">62%</span> · DRAWER <span class="v">41%</span><br>
-        LAST CYCLE <span class="v">12:40</span></div>`;
+      /* feline systems: live litter-robot + cat sensors (mock values as fallbacks).
+         Round numeric states — sensors report floats like 72.6027397260274 */
+      const cat = (id, d) => { const v = HA.st(id)?.state ?? d;
+        const n = parseFloat(v); return isNaN(n) ? v : Math.round(n * 10) / 10; };
+      cats.innerHTML = `<div class="clb">
+        MELIA <span class="v">${cat('sensor.melia_visits_today','3')} VISITS · ${cat('sensor.melia_weight','9.2')} LB</span><br>
+        PEACHY <span class="v">${cat('sensor.peachy_visits_today','5')} VISITS · ${cat('sensor.peachy_weight','11.4')} LB</span><br>
+        LITTER <span class="v">${cat('sensor.litter_robot_4_litter_level','62')}%</span> ·
+        DRAWER <span class="v">${cat('sensor.litter_robot_4_waste_drawer','41')}%</span><br>
+        STATUS <span class="v">${(HA.st('vacuum.litter_robot_4_litter_box')?.state ?? 'READY').toUpperCase()}</span></div>`;
       break; }
 
     /* ---------------- CORE ---------------- */
@@ -814,9 +825,18 @@ function renderWorkspace(scr, g, view, x0, y0, x1, y1) {
       break; }
     case 'core:UPDATES': {
       const [up] = cols([['peach','SOFTWARE UPDATES']]);
-      up.innerHTML = `<div class="clb">HA CORE <span class="v">UP TO DATE</span><br>
-        LCARDS <span class="v">UP TO DATE</span><br>HA-LCARS <span class="v">UP TO DATE</span><br>
-        HACS <span class="v">UP TO DATE</span><br><br><span class="w">LIVE STATUS IN PHASE 2</span></div>`;
+      /* live: enumerate update.* entities — state 'on' means an update waits */
+      const updates = Object.entries(HA.states)
+        .filter(([k]) => k.startsWith('update.')).slice(0, 10)
+        .map(([k, s]) => {
+          const name = (s.attributes?.friendly_name ?? k.split('.')[1].replace(/_/g, ' '))
+            .replace(/ update$/i, '').toUpperCase();
+          return `${name} ${s.state === 'on'
+            ? `<span class="w">UPDATE AVAILABLE${s.attributes?.latest_version ? ' · ' + s.attributes.latest_version : ''}</span>`
+            : '<span class="v">UP TO DATE</span>'}`;
+        });
+      up.innerHTML = `<div class="clb">${updates.length
+        ? updates.join('<br>') : 'NO UPDATE ENTITIES · <span class="w">SIMULATED</span>'}</div>`;
       break; }
 
     default: workspaceStandby(scr, x0, y0, x1, y1, g);
