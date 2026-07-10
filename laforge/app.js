@@ -438,17 +438,33 @@ function loadScript(src, cssHref) {
 
 /* viewscreen popup: LCARS bezel + title + CLOSE — reusable (NASA Eyes now,
    camera feeds later). One at a time; ESC or CLOSE dismisses. */
-function viewscreen(title, contentHTML, onClose) {
+/* TRUE LCARS mini-frame popup (UI_STANDARDS §9, ref: Stellar Cartography).
+   Own rail + title bar + bottom bar + corner sweeps; palette-role colors so
+   alert conditions recolor popups too. color = context (salmon for security…). */
+function viewscreen(title, contentHTML, onClose, color = 'lilac') {
   document.getElementById('vpop')?.remove();
+  const segs = ['peri', 'lilac', 'peach'].map(c =>
+    `<div class="vs-seg" style="background:var(--c-${c})">${100 + Math.floor(Math.random() * 900)}</div>`).join('');
   const v = document.createElement('div');
   v.id = 'vpop';
-  v.innerHTML = `<div class="vpop-frame">
-    <div class="vpop-bar"><span>${title}</span><div class="vpop-close">▣ CLOSE</div></div>
-    <div class="vpop-body">${contentHTML}</div></div>`;
+  v.innerHTML = `<div class="vs-frame">
+    <div class="vs-ctl"  style="background:var(--c-${color})"></div>
+    <div class="vs-top"  style="background:var(--c-${color})"><span>${title}</span>
+      <div class="vs-close">✕ CLOSE</div></div>
+    <div class="vs-rail">${segs}<div class="vs-fill" style="background:var(--c-${color})"></div></div>
+    <div class="vs-body">
+      <svg class="vs-in vs-in-t" viewBox="0 0 20 20" preserveAspectRatio="none">
+        <path d="M0 0 L20 0 A20 20 0 0 0 0 20 Z" fill="var(--c-${color})"/></svg>
+      <svg class="vs-in vs-in-b" viewBox="0 0 20 20" preserveAspectRatio="none">
+        <path d="M0 20 L20 20 A20 20 0 0 1 0 0 Z" fill="var(--c-${color})"/></svg>
+      ${contentHTML}</div>
+    <div class="vs-cbl"  style="background:var(--c-${color})"></div>
+    <div class="vs-bot"  style="background:var(--c-${color})"></div>
+  </div>`;
   document.body.appendChild(v);
   v.animate([{opacity:0},{opacity:1}], {duration:180, fill:'forwards'});
-  const close = () => { onClose?.(); v.remove(); };   // onClose: clear feed intervals etc.
-  v.querySelector('.vpop-close').addEventListener('pointerup', close);
+  const close = () => { onClose?.(); v.remove(); };
+  v.querySelector('.vs-close').addEventListener('pointerup', close);
   v.addEventListener('pointerup', e => { if (e.target === v) close(); });
   return v;
 }
@@ -458,7 +474,7 @@ function viewscreen(title, contentHTML, onClose) {
 function camPopup(name, entity) {
   const v = viewscreen('VIEWSCREEN · ' + name + ' · LIVE FEED',
     `<img class="campop" alt="ACQUIRING SIGNAL…">`,
-    () => clearInterval(t));
+    () => clearInterval(t), 'salmon');            // security context = salmon frame
   const img = v.querySelector('img');
   const refresh = async () => {
     const u = await HA.cameraUrl(entity);
@@ -507,7 +523,8 @@ function roomPopup(roomId) {
       <span class="v">${state}${s?.attributes?.unit_of_measurement ? ' ' + s.attributes.unit_of_measurement : ''}</span>${ctl}</div>`;
   }).join('');
   const v = viewscreen('ROOM SYSTEMS · ' + room.label,
-    `<div class="clb rp">${rows || '<div class="rp-row">NO SYSTEMS REGISTERED</div>'}</div>`);
+    `<div class="clb rp">${rows || '<div class="rp-row">NO SYSTEMS REGISTERED</div>'}</div>`,
+    null, 'peri');                                 // HOME context = peri frame
   /* wire controls — sirens are REAL and LOUD: confirm before toggling one */
   v.querySelectorAll('[data-toggle]').forEach(b => b.addEventListener('pointerup', () => {
     const id = b.dataset.toggle;

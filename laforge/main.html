@@ -65,20 +65,36 @@
   .feed iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
   .cesium-viewer-bottom{display:none!important}  /* hide Cesium credit strip inside the bezel */
 
-  /* viewscreen popup (NASA Eyes, camera feeds): full-screen LCARS-framed overlay */
+  /* viewscreen popup — TRUE LCARS mini-frame (UI_STANDARDS §9):
+     grid = [rail | main] × [title | body | bottom]; outer left corners round,
+     inner corners get concave SVG webs; right side stays open (bracket) */
   #vpop{position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.72);
     display:flex;align-items:center;justify-content:center}
-  .vpop-frame{width:78vw;height:80vh;display:flex;flex-direction:column;
-    background:#000;border-radius:calc(var(--u)*0.6);overflow:hidden;
-    border:2px solid var(--c-lilac,#cc99cc)}
-  .vpop-bar{height:calc(var(--u)*1.4);background:var(--c-lilac,#cc99cc);color:#000;
-    display:flex;align-items:center;justify-content:space-between;
-    padding:0 calc(var(--u)*0.6);font-family:Antonio;font-size:calc(var(--u)*0.55);
-    font-weight:600;letter-spacing:.1em;text-transform:uppercase}
-  .vpop-close{cursor:pointer;background:var(--c-salmon,#cc6666);color:#000;
-    padding:calc(var(--u)*0.1) calc(var(--u)*0.5);border-radius:calc(var(--u)*0.5)}
-  .vpop-body{flex:1;position:relative}
-  .vpop-body iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+  .vs-frame{width:78vw;height:80vh;display:grid;position:relative;background:#000;
+    grid-template-columns:calc(var(--u)*1.25) 1fr;
+    grid-template-rows:calc(var(--u)*0.9) 1fr calc(var(--u)*0.5)}
+  .vs-ctl{grid-area:1/1;border-top-left-radius:calc(var(--u)*1)}
+  .vs-cbl{grid-area:3/1;border-bottom-left-radius:calc(var(--u)*1)}
+  .vs-top{grid-area:1/2;display:flex;align-items:center;justify-content:space-between;
+    padding-left:calc(var(--u)*0.5);color:#000;font-family:Antonio;
+    font-size:calc(var(--u)*0.55);font-weight:600;letter-spacing:.1em;
+    text-transform:uppercase;border-radius:0 calc(var(--u)*0.45) calc(var(--u)*0.45) 0}
+  .vs-close{cursor:pointer;background:var(--c-salmon,#cc6666);color:#000;height:100%;
+    display:flex;align-items:center;padding:0 calc(var(--u)*0.6);font-weight:700;
+    border-radius:0 calc(var(--u)*0.45) calc(var(--u)*0.45) 0}
+  .vs-rail{grid-area:2/1;display:flex;flex-direction:column;gap:calc(var(--u)*0.18);
+    padding-top:calc(var(--u)*0.18)}
+  .vs-seg{flex:0 0 calc(var(--u)*1.6);display:flex;align-items:flex-end;
+    justify-content:flex-end;padding:2px 4px;color:#000;font-family:Antonio;
+    font-size:calc(var(--u)*0.32);font-weight:600}
+  .vs-fill{flex:1;margin-top:calc(var(--u)*0.0)}
+  .vs-bot{grid-area:3/2;margin-top:calc(var(--u)*0.18);
+    border-radius:0 calc(var(--u)*0.25) calc(var(--u)*0.25) 0}
+  .vs-body{grid-area:2/2;position:relative;overflow:hidden}
+  .vs-body iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+  .vs-in{position:absolute;width:calc(var(--u)*0.5);height:calc(var(--u)*0.5);
+    z-index:3;pointer-events:none}
+  .vs-in-t{top:0;left:0} .vs-in-b{bottom:0;left:0}
 
   /* alert-condition overlay: pulsing vignette, pointer-transparent.
      ~1.4s pulse — the TNG klaxon cadence, deliberately NOT synced to
@@ -133,9 +149,9 @@
 <!-- config.local.js is GITIGNORED (HA token); absent = simulated mode.
      ?v= version query = cache-bust (bump when shipping to the kiosk/Fred) -->
 <script src="config.local.js" onerror="console.warn('[LaForge] no local config — simulated mode')"></script>
-<script src="lcars.js?v=10"></script>
-<script src="floorplan.js?v=10"></script>
-<script src="ha.js?v=10"></script>
-<script src="app.js?v=10"></script>
+<script src="lcars.js?v=11"></script>
+<script src="floorplan.js?v=11"></script>
+<script src="ha.js?v=11"></script>
+<script src="app.js?v=11"></script>
 </body>
 </html>

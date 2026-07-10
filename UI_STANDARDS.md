@@ -156,7 +156,29 @@ Elbow shape + spacing both LOCKED.
 - Breathing pulse spec: opacity 1 → ~0.18 (bars) / ~0.5 (buttons, so labels stay legible),
   3–4s ease-in-out, staggered per element.
 
-## 9. Build note
+## 9. VIEWSCREEN POPUP — LOCKED (2026-07-09, Patrick; ref: Stellar Cartography okudagram)
+Popups are TRUE LCARS mini-frames, not modals. Reference: the SPACE/TIME
+REGULARIZATIO inset panel (stellar cartography screen) — a popup carries a
+small-but-complete frame of its own.
+
+| Spec | Value |
+|---|---|
+| left rail width | **1.25u** |
+| title bar height | **0.9u** (title in black `--fs-sub` ON the bar) |
+| bottom bar height | **0.5u** |
+| outer corners (left side) | radius **1u** (top-left, bottom-left) |
+| inner corners (body TL/BL) | concave web, radius **0.5u** (SVG quarter-arc piece) |
+| rail segments | ≥3 blocks, colors cycle [peri, lilac, peach], seam 0.18u, tiny `--fs-data` numbers |
+| CLOSE | salmon capRight segment at the title bar's right end (cap = button, §6) |
+| frame color | context color (default lilac; caller may pass e.g. salmon for security) |
+| backdrop | black @ ~72% — the terminal stays visible behind |
+| size | 78vw × 80vh centered |
+
+Rules: the popup frame uses the SAME palette roles (so alert conditions recolor
+popups too); right side stays open/black (bracket, not a closed box); content
+renders in the body like any workspace panel. Tap backdrop or CLOSE to dismiss.
+
+## 10. Build note
 The tier-3 custom renderer implements all of the above with its own SVG element primitive
 (the ported `createRadiusPath`). The old ha-lcars `btn()`/`bar()` helpers are superseded but
 the SPECS here are unchanged — same units, same radii, same colors.
