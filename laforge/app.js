@@ -313,9 +313,9 @@ function renderSystems(scr, W, H) {
   scr.text(cx1 - 18, BARH + 2.5, 18, 2.5, 'SYSTEMS', { fs:'title', color:'orange', align:'right', weight:700 });
   scr.text(cx1 - 18, BARH + 5, 18, 0.5, '', { fs:'data', color:'gold', align:'right' }).id = 'clk';
 
-  /* three config panels */
+  /* four config panels (ROUTINES added 2026-07-12) */
   const y0 = BARH + 6.5, y1 = H - BARH - GAP;
-  const w3 = Math.floor(((cx1 - cx0) - 2 * GAP) / 3 * 4) / 4;
+  const w3 = Math.floor(((cx1 - cx0) - 3 * GAP) / 4 * 4) / 4;
   const panel = (i, color, title) => {
     const x = cx0 + i * (w3 + GAP);
     scr.shape(x, y0, w3, 1.1, { capRight:true, color });
@@ -354,12 +354,63 @@ function renderSystems(scr, W, H) {
   const mb = scr.button(vx0 + 1, y1 - 2.5, w3 - 2, muted ? 'UNMUTE MIC' : 'MUTE MIC',
     { color: muted ? 'lilac' : 'salmon', on: true, ends:'pill' });
   scr.onTap(mb, () => { LCARS.settings.set('micMute', !muted); render(); });
+
+  /* ROUTINE ASSIGNMENTS: bind interface events to HA scripts/scenes/automations.
+     Dropdowns populate from LIVE HA entities; choices persist across restarts. */
+  const rx0 = panel(3, 'peach', 'ROUTINE ASSIGNMENTS');
+  const rp = scr.panel(rx0, y0 + 1.35, w3, y1 - y0 - 1.35);
+  const routines = Object.keys(HA.states)
+    .filter(k => /^(script|scene|automation)\./.test(k)).sort();
+  const opts = sel => `<option value="">— NONE —</option>` + routines.map(r => {
+    const fn = (HA.st(r)?.attributes?.friendly_name ?? r.split('.')[1].replace(/_/g, ' ')).toUpperCase();
+    return `<option value="${r}" ${r === sel ? 'selected' : ''}>${fn} [${r.split('.')[0].toUpperCase()}]</option>`;
+  }).join('');
+  let html = '', lastGrp = '';
+  for (const h of HOOKS) {
+    if (h.grp !== lastGrp) { html += `<div class="rt-grp">${h.grp}</div>`; lastGrp = h.grp; }
+    html += `<div class="rt-row"><span>${h.label}</span>
+      <select class="rt-sel" data-hook="${h.id}">${opts(LCARS.settings.get('hook:' + h.id, ''))}</select></div>`;
+  }
+  rp.innerHTML = `<div class="clb rt">${routines.length ? html
+    : 'NO ROUTINES IN HA YET — create a script or scene, it appears here.'}</div>`;
+  rp.querySelectorAll('.rt-sel').forEach(s => s.addEventListener('change', () => {
+    LCARS.settings.set('hook:' + s.dataset.hook, s.value); SFX.play('chirp');
+  }));
 }
 
 /* ============================ WORKSPACES ============================
    One builder per (group × local view) — the SPOKE MAP (LAFORGE_DESIGN.md)
    made executable. All mock data; Phase 2 swaps DATA for HA state. */
 let localView = {};   // groupId → active view index (session-scoped; kiosk boots to defaults)
+
+/* ============================ ROUTINE HOOKS ============================
+   Assignable event → HA routine bindings (Patrick's request 2026-07-12).
+   HOW TO USE (Patrick): build a script or scene in HA (e.g. "red lights +
+   klaxon on IoT speakers") → open SYSTEMS → ROUTINE ASSIGNMENTS → pick it
+   from the dropdown next to the event. Persisted in localStorage; fires via
+   script.turn_on / scene.turn_on / automation.trigger.
+   Adding a new hook point = one line here + one fireHook() call at the event. */
+const HOOKS = [
+  { grp:'ALERT CONDITIONS', id:'alert.red',    label:'RED ALERT ENGAGED' },
+  { grp:'ALERT CONDITIONS', id:'alert.yellow', label:'YELLOW ALERT ENGAGED' },
+  { grp:'ALERT CONDITIONS', id:'alert.green',  label:'STAND DOWN' },
+  { grp:'TERMINAL',         id:'boot.complete',label:'BOOT COMPLETE' },
+  { grp:'TERMINAL',         id:'saver.start',  label:'SCREENSAVER START' },
+  { grp:'TERMINAL',         id:'saver.wake',   label:'SCREENSAVER WAKE' },
+  { grp:'HOLODECK',         id:'holo.energize',    label:'TRANSPORTER ENERGIZE' },
+  { grp:'HOLODECK',         id:'holo.breach.start',label:'BREACH SIM · START' },
+  { grp:'HOLODECK',         id:'holo.breach.win',  label:'BREACH SIM · AVERTED' },
+  { grp:'HOLODECK',         id:'holo.breach.fail', label:'BREACH SIM · SHIP LOST' },
+  { grp:'HOLODECK',         id:'holo.phaser',      label:'PHASERS FIRED' },
+  { grp:'HOLODECK',         id:'holo.torpedo',     label:'TORPEDO FIRED' },
+];
+function fireHook(id) {
+  const ent = LCARS.settings.get('hook:' + id, '');
+  if (!ent) return;                                          // unassigned = silent no-op
+  const domain = ent.split('.')[0];
+  if (domain === 'automation') HA.call('automation', 'trigger', { entity_id: ent });
+  else HA.call(domain, 'turn_on', { entity_id: ent });       // script + scene both use turn_on
+}
 
 /* equal-width titled panel columns — the standard workspace skeleton */
 function wsCols(scr, x0, y0, x1, y1, defs) {
@@ -947,6 +998,7 @@ function playBoot(scr) {
     bootUntil = performance.now();             // unblock any waiting live render
     typers.forEach(clearInterval);
     anims.forEach(a => a.finish());
+    fireHook('boot.complete');
     ov.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 350, fill: 'forwards' })
       .onfinish = () => ov.remove();
     removeEventListener('pointerdown', finish, true);
@@ -965,6 +1017,7 @@ const SAVER = {
     if (!this.active) this.timer = setTimeout(() => this.start(), this.mins() * 60000); },
   start() {
     if (this.active) return; this.active = true;
+    fireHook('saver.start');
     const d = document.createElement('div');
     d.id = 'saver';
     /* Media ladder (best available wins, saver never shows a broken icon):
@@ -1000,6 +1053,7 @@ const SAVER = {
   },
   stop() {
     if (!this.active) return; this.active = false;
+    fireHook('saver.wake');
     clearInterval(this.clk);
     const d = document.getElementById('saver');
     if (d) d.animate([{opacity:1},{opacity:0}], {duration:300, fill:'forwards'})
@@ -1043,6 +1097,7 @@ function applyAlert(mode) {
   if (mode === shownAlert) return;
   shownAlert = mode;
   document.getElementById('alert-overlay')?.remove();
+  fireHook(mode === 'red_alert' ? 'alert.red' : mode === 'yellow_alert' ? 'alert.yellow' : 'alert.green');
   if (mode === 'red_alert' || mode === 'yellow_alert') {
     LCARS.setPalette(mode === 'red_alert' ? 'redalert' : 'yellowalert');
     const o = document.createElement('div');

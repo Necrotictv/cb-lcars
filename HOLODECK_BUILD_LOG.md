@@ -53,3 +53,19 @@
   and the consoles will fire them automatically. Real TNG sounds: drop mp3s in
   laforge/assets/sfx/ (names: beep, chirp, deny, klaxon, shimmer, phaser, torpedo,
   eject, powerup, alarm). Your fridge water filter is at 100% — actually replace it.
+
+## ═══ SPRINT 2 — 2026-07-12 (assets + sounds + transporter remake + hooks) ═══
+| # | Decision | Why |
+|---|---|---|
+| 14 | Assets pulled from OneDrive\Pictures per Patrick's direction (explicit consent to reach outside project scope for those files) | Tim Davies MSDs ×3, warpcore.gif, transporter.gif reference |
+| 15 | trekcore downloads (Patrick-directed): 10 TNG sounds via sfx override slots. Required Referer header (hotlink protection). Personal use, his home | beep=computerbeep_41, chirp=input_ok_2, deny=denybeep1, klaxon=tng_red_alert1, shimmer=tng_transporter3, phaser=tng_phaser3, torpedo=tng_torpedo3, powerup=power_up1, alarm=alertklaxon, +energize |
+| 16 | Transporter rebuilt to the gif: THREE multitouch tracks (pointer-capture each; 3 fingers works), sweep up ≥85% on all → energize; decay if released early; elbow-framed OPERATIONS deck + blinking flavor clusters | The 3-track sweep IS the console; canon is king |
+| 17 | Chamber/console = 42/58 proportional split | Fixed heights starved the tracks on small windows (found in verification) |
+| 18 | Hardcoded holoFx scripts RETIRED → assignable ROUTINE HOOKS engine (12 hook points, SYSTEMS dropdowns, persisted). Patrick's red-alert-lights example = bind script to 'RED ALERT ENGAGED' | His ask: self-service binding, no code edits |
+| 19 | MSD = image cutaways + %-positioned tap spots (spots data-editable in SHIPS map); SVG ships retired; Voyager now BUILT (image), Excelsior/DS9 still queued | Real MSDs beat my vectors; canon is king |
+| 20 | Warp core = warpcore.gif with CSS-shaft fallback via onerror | Patrick's animation; graceful degrade |
+**Verified live:** 3-track energize (98·98·98 → ENERGIZING), MSD galaxy image + 4 spots,
+12 hook dropdowns (1 routine in HA so far — grows as he adds scripts), TNG sounds
+downloaded (10/10 OK incl. 839KB tng_red_alert1).
+**Test artifact note:** JS-driven navigate+render can catch fade mid-flight in
+screenshots (dim); real taps render bright.

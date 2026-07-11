@@ -214,6 +214,18 @@ but control nothing that matters. The room becomes the set.
 - **ASTROMETRICS** (chetwode?) — star maps / solar system embeds, flight radar, traffic cams
 - SYSTEMS is NOT a spoke — it's terminal chrome (rail button), config only.
 
+## ROUTINE HOOKS — how Patrick connects the interface to real-world effects
+**(built 2026-07-12; this is the user manual)**
+1. In HA: create a **script** or **scene** (or automation) that does the thing —
+   e.g. script "Red Alert Room FX": set color bulbs red + play klaxon on IoT speakers.
+2. On the terminal: **SYSTEMS → ROUTINE ASSIGNMENTS** → find the event (grouped by
+   screen: ALERT CONDITIONS / TERMINAL / HOLODECK) → pick your routine in the dropdown.
+3. Done. The binding persists across restarts. — NONE — unbinds.
+Current hook points (12): alert red/yellow/stand-down · boot complete · screensaver
+start/wake · transporter energize · breach sim start/averted/ship-lost · phasers ·
+torpedo. **Adding a new hook = 1 line in HOOKS[] (app.js) + one fireHook(id) call at
+the event site.** Dropdowns auto-populate from live script.*/scene.*/automation.*.
+
 ## DEPLOYMENT TARGET (Patrick, 2026-07-04): Fred's webstack
 The terminal ultimately ships to Fred (Proxmox host, 10.0.0.x). Organizational rules:
 

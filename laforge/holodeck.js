@@ -11,44 +11,96 @@
 const HOLOGROUP = { id:'holodeck', label:'HOLODECK', color:'gold',
   local:['TRANSPORTER','WARP CORE','MSD','TACTICAL'] };
 
-/* room-effect hook: fire the HA script if Patrick has built it; report honestly */
-function holoFx(script) {
-  if (HA.st('script.' + script)) { HA.call('script', 'turn_on', { entity_id: 'script.' + script }); return true; }
-  return false;
-}
-
-/* ============================ TRANSPORTER ============================ */
+/* ============================ TRANSPORTER ============================
+   Rebuilt 2026-07-12 to Patrick's reference gif: the THREE-TRACK touch-slider
+   sweep IS the console. Drag all three tracks up past 85% → energize.
+   Multitouch: each track captures its own pointer (three fingers works).
+   Room effects fire through the assignable hook `holo.energize` (SYSTEMS →
+   ROUTINE ASSIGNMENTS) — Patrick's IoT handles the physical transporter. */
 function holoTransporter(scr, x0, y0, x1, y1) {
-  const wPad = Math.floor((x1 - x0) * 0.62 * 4) / 4;
-  const [pad] = wsCols(scr, x0, y0, x0 + wPad, y1, [['gold','TRANSPORTER · PAD 3']]);
-  pad.innerHTML = `<div class="tr-room">
+  /* proportional split: chamber 42% / console 58% — the three-track console
+     is the star of the reference gif and must never be starved by window size */
+  const mid = y0 + Math.floor((y1 - y0) * 0.42 * 4) / 4;
+
+  /* upper: transport chamber (pads) */
+  const [pad] = wsCols(scr, x0, y0, x1, mid - 0.25, [['gold','TRANSPORT CHAMBER']]);
+  pad.innerHTML = `<div class="tr-room" style="padding-bottom:calc(var(--u)*1.6)">
     ${[0,1,2].map(i => `<div class="tr-pad" data-i="${i}"><div class="tr-disc"></div><div class="tr-col"></div></div>`).join('')}
     <div class="tr-status" id="tr-status">STANDING BY</div></div>`;
-  const dx = x0 + wPad + GAP;
-  const [ct] = wsCols(scr, dx, y0, x1, y1, [['peach','CONTROL']]);
-  ct.innerHTML = `<div class="btncol">
-    <div class="wbtn" id="tr-energize" style="background:var(--c-gold)">◉ ENERGIZE</div>
-    <div class="wbtn" style="background:var(--c-peri)">TARGETING SCANNERS</div>
-    <div class="wbtn" style="background:var(--c-lilac)">PATTERN BUFFER</div></div>
-    <div class="clb" style="height:auto">FX ${HA.st('script.laforge_transporter_fx')
-      ? '<span class="v">ROOM + LOCAL</span>' : '<span class="w">LOCAL ONLY</span>'}<br>
-    <span style="opacity:.55">ROOM FX HOOKUP: script.laforge_transporter_fx</span></div>`;
-  let busy = false;
-  scr.onTap(ct.querySelector('#tr-energize'), () => {
-    if (busy) return; busy = true;
-    SFX.play('shimmer');
-    holoFx('laforge_transporter_fx');                       // dims room + color routine (when built)
+
+  /* lower: operations console — elbow-framed deck, three touch tracks center */
+  const cy = mid + 0.25;
+  scr.elbow(x0, cy, { corner:'tl', tv:1, th:0.75, ro:0.75, ri:0.4, w:2.5, h:2.5, color:'gold' });
+  scr.bar(x0 + 2.5, cy, (x1 - x0) - 4.25, 0.75, 'gold', { left:true });
+  scr.shape(x1 - 1.5, cy, 1.5, 0.75, { capRight:true, color:'peach' });
+  scr.text(x0 + 2.75, cy, 14, 0.75, 'OPERATIONS · MOLECULAR IMAGING', { fs:'data', color:'black', weight:700 });
+  scr.bar(x0, cy + 2.5, 1, (y1 - cy) - 2.5, 'gold', { top:true });   // elbow rail continues
+  const deck = scr.panel(x0 + 1.25, cy + 1, x1 - x0 - 1.25, y1 - cy - 1);
+  deck.innerHTML = `
+    <div class="tc-deck">
+      <div class="tc-cluster">
+        <div class="tc-blk" data-fn="scan" style="background:var(--c-peri)">SCAN</div>
+        <div class="tc-blk" data-fn="buffer" style="background:var(--c-lilac)">BUFFER</div>
+        <div class="tc-blk tc-blink" style="background:var(--c-salmon)">784</div>
+        <div class="tc-blk tc-blink2" style="background:var(--c-peach)">211</div>
+      </div>
+      <div class="tc-tracks">
+        ${[0,1,2].map(i => `<div class="tc-track" data-t="${i}"><div class="tc-fill"></div><div class="tc-grip"></div></div>`).join('')}
+      </div>
+      <div class="tc-cluster">
+        <div class="tc-blk tc-blink2" style="background:var(--c-canary)">SYNC</div>
+        <div class="tc-blk tc-blink" style="background:var(--c-peri)">043</div>
+        <div class="tc-readout" id="tc-read">TRACKS 0%·0%·0%</div>
+      </div>
+    </div>`;
+
+  const vals = [0, 0, 0]; let locked = false;
+  const tracks = [...deck.querySelectorAll('.tc-track')];
+  const readout = deck.querySelector('#tc-read');
+  const paint = i => {
+    const t = tracks[i], pct = Math.round(vals[i] * 100);
+    t.querySelector('.tc-fill').style.height = pct + '%';
+    t.querySelector('.tc-grip').style.bottom = pct + '%';
+    readout.textContent = 'TRACKS ' + vals.map(v => Math.round(v * 100) + '%').join('·');
+  };
+  function energize() {
+    locked = true;
+    SFX.play('energize'); setTimeout(() => SFX.play('shimmer'), 500);
+    fireHook('holo.energize');                              // Patrick's IoT routine
     const st = document.getElementById('tr-status');
     st.textContent = 'ENERGIZING…';
-    pad.querySelectorAll('.tr-pad').forEach((p, i) =>
-      setTimeout(() => p.classList.add('tr-active'), i * 180));
-    setTimeout(() => { st.textContent = 'PATTERN DEMATERIALIZED'; }, 2400);
+    tracks.forEach(t => t.classList.add('tc-lock'));
+    pad.querySelectorAll('.tr-pad').forEach((p, i) => setTimeout(() => p.classList.add('tr-active'), 300 + i * 180));
+    setTimeout(() => st.textContent = 'PATTERN DEMATERIALIZED', 2800);
     setTimeout(() => {
       pad.querySelectorAll('.tr-pad').forEach(p => p.classList.remove('tr-active'));
       st.textContent = 'TRANSPORT COMPLETE'; SFX.play('chirp');
-      setTimeout(() => { st.textContent = 'STANDING BY'; busy = false; }, 2000);
-    }, 4200);
+      tracks.forEach(t => t.classList.remove('tc-lock'));
+      vals.fill(0); [0,1,2].forEach(paint);
+      setTimeout(() => { st.textContent = 'STANDING BY'; locked = false; }, 1800);
+    }, 5200);
+  }
+  tracks.forEach((t, i) => {
+    const set = e => {
+      if (locked) return;
+      const r = t.getBoundingClientRect();
+      vals[i] = Math.max(0, Math.min(1, 1 - (e.clientY - r.top) / r.height));
+      paint(i);
+      if (vals.every(v => v >= 0.85)) energize();
+    };
+    t.addEventListener('pointerdown', e => { t.setPointerCapture(e.pointerId); set(e); t.onpointermove = set; });
+    const drop = () => { t.onpointermove = null;
+      if (!locked && vals[i] < 0.85) {                       // decay if not committed
+        const decay = setInterval(() => { vals[i] = Math.max(0, vals[i] - 0.06); paint(i);
+          if (vals[i] <= 0) clearInterval(decay); }, 40); } };
+    t.addEventListener('pointerup', drop); t.addEventListener('pointercancel', drop);
   });
+  deck.querySelectorAll('[data-fn]').forEach(b => scr.onTap(b, () => {
+    SFX.play('beep');
+    const st = document.getElementById('tr-status');
+    st.textContent = b.dataset.fn === 'scan' ? 'TARGETING SCANNERS SWEEPING' : 'PATTERN BUFFER CYCLED';
+    setTimeout(() => { if (!locked) st.textContent = 'STANDING BY'; }, 2200);
+  }));
 }
 
 /* ============================ WARP CORE + BREACH GAME ============================ */
@@ -63,9 +115,11 @@ let game = null;   // { correct, deadline, timer }
 function holoWarpCore(scr, x0, y0, x1, y1) {
   const wCore = Math.floor((x1 - x0) * 0.3 * 4) / 4;
   const [core] = wsCols(scr, x0, y0, x0 + wCore, y1, [['gold','WARP CORE']]);
-  core.innerHTML = `<div class="wc"><div class="wc-shaft">` +
-    Array.from({ length: 9 }, (_, i) => `<div class="wc-seg" style="animation-delay:${i * 0.14}s"></div>`).join('') +
-    `</div><div class="wc-label" id="wc-label">MATTER / ANTIMATTER REACTION STABLE</div></div>`;
+  /* Patrick's warp core animation (assets/warpcore.gif); CSS shaft = fallback */
+  core.innerHTML = `<div class="wc">
+    <div class="wc-shaft"><img class="wc-gif" src="assets/warpcore.gif" alt=""
+      onerror="this.remove();this.parentElement.innerHTML=Array.from({length:9},(_,i)=>'<div class=wc-seg style=animation-delay:'+(i*0.14)+'s></div>').join('')">
+    </div><div class="wc-label" id="wc-label">MATTER / ANTIMATTER REACTION STABLE</div></div>`;
 
   const cx = x0 + wCore + GAP, wCtl = Math.floor((x1 - cx) * 0.55 * 4) / 4;
   const [flows] = wsCols(scr, cx, y0, cx + wCtl, y1, [['peach','FLOW REGULATION']]);
@@ -96,9 +150,9 @@ function holoWarpCore(scr, x0, y0, x1, y1) {
     clearInterval(game?.timer); game = null;
     document.getElementById('holo-red')?.remove();
     alarmEl.innerHTML = '';
-    if (win) { SFX.play('chirp'); label.textContent = msg; }
+    if (win) { SFX.play('chirp'); fireHook('holo.breach.win'); label.textContent = msg; }
     else {   /* the ship is lost — say it with theatre */
-      SFX.play('torpedo');
+      SFX.play('torpedo'); fireHook('holo.breach.fail');
       const d = document.createElement('div');
       d.className = 'wc-lost'; d.innerHTML = '<div>SHIP LOST</div><div class="wc-lost-sub">SIMULATION FAILED · ' + msg + '</div>';
       document.body.appendChild(d);
@@ -140,7 +194,7 @@ function holoWarpCore(scr, x0, y0, x1, y1) {
     const inc = INCIDENTS[Math.floor(Math.random() * INCIDENTS.length)];
     game = { correct: inc[1], success: inc[2], deadline: Date.now() + 20000 };
     SFX.play('klaxon');
-    holoFx('laforge_breach_fx');               // room lighting drama (when Patrick builds it)
+    fireHook('holo.breach.start');             // assignable room drama (SYSTEMS → ROUTINES)
     const red = document.createElement('div'); // LOCAL red wash — NOT the house alert entity
     red.id = 'holo-red'; document.body.appendChild(red);
     label.textContent = '⚠ ' + inc[0];
@@ -154,50 +208,24 @@ function holoWarpCore(scr, x0, y0, x1, y1) {
   });
 }
 
-/* ============================ MSD (ship schematics) ============================ */
+/* ============================ MSD (ship schematics) ============================
+   Patrick-supplied cutaway images (Tim Davies MSDs, assets/msd_*.jpg).
+   spots = tappable systems as image-percentage coordinates — NUDGE THESE
+   by editing x/y if a dot sits off its system. */
 const SHIPS = {
-  'ENTERPRISE-D': { built: true, draw: drawEntD },
-  'DEFIANT':      { built: true, draw: drawDefiant },
-  'EXCELSIOR':    { built: false }, 'DEEP SPACE 9': { built: false }, 'VOYAGER': { built: false },
+  'ENTERPRISE-D': { img:'assets/msd_galaxy.jpg', spots:[
+    { sys:'bridge', x:66, y:21 }, { sys:'core', x:34, y:53 },
+    { sys:'deflector', x:44, y:56 }, { sys:'nacelles', x:14, y:44 } ] },
+  'VOYAGER':      { img:'assets/msd_voyager.jpg', spots:[
+    { sys:'bridge', x:55, y:25 }, { sys:'core', x:48, y:55 },
+    { sys:'deflector', x:30, y:60 }, { sys:'nacelles', x:75, y:55 } ] },
+  'DEFIANT':      { img:'assets/msd_defiant.jpg', spots:[
+    { sys:'bridge', x:48, y:28 }, { sys:'core', x:52, y:55 },
+    { sys:'deflector', x:18, y:50 }, { sys:'nacelles', x:70, y:60 } ] },
+  'EXCELSIOR':    {}, 'DEEP SPACE 9': {},
 };
 let msdShip = 'ENTERPRISE-D';
 
-/* Original vector side elevations — recognizable silhouettes, okudagram lines.
-   (Decision log #6: two RIGHT ships beat five wrong ones.) */
-function drawEntD(C) {
-  return `<svg viewBox="0 0 400 150" style="width:100%;height:100%">
-    <g stroke="${C('lilac')}" stroke-width="1" fill="none">
-      <ellipse cx="150" cy="45" rx="120" ry="16"/>
-      <ellipse cx="150" cy="45" rx="34" ry="7"/>
-      <path d="M210 55 Q235 60 245 84 L285 96 Q260 104 240 100 L205 62"/>
-      <path d="M245 84 Q255 92 300 94"/>
-      <rect x="235" y="96" width="14" height="10" rx="4"/>
-      <path d="M262 100 L330 108"/><path d="M262 108 L330 118"/>
-      <rect x="325" y="103" width="70" height="9" rx="4.5"/>
-      <rect x="325" y="114" width="70" height="9" rx="4.5"/>
-      <path d="M150 29 L150 12" stroke-dasharray="2 3"/>
-    </g>
-    <g data-sys="bridge"    style="cursor:pointer"><circle cx="150" cy="26" r="5" fill="${C('gold')}"/><text x="158" y="16" font-size="7" fill="${C('lilac')}" font-family="Antonio">BRIDGE</text></g>
-    <g data-sys="core"      style="cursor:pointer"><circle cx="242" cy="90" r="5" fill="${C('salmon')}"><animate attributeName="opacity" values="1;.4;1" dur="2.2s" repeatCount="indefinite"/></circle><text x="205" y="128" font-size="7" fill="${C('lilac')}" font-family="Antonio">WARP CORE</text></g>
-    <g data-sys="deflector" style="cursor:pointer"><circle cx="300" cy="94" r="5" fill="${C('peri')}"/><text x="290" y="82" font-size="7" fill="${C('lilac')}" font-family="Antonio">DEFLECTOR</text></g>
-    <g data-sys="nacelles"  style="cursor:pointer"><circle cx="360" cy="108" r="5" fill="${C('peach')}"/><text x="340" y="98" font-size="7" fill="${C('lilac')}" font-family="Antonio">NACELLES</text></g>
-  </svg>`;
-}
-function drawDefiant(C) {
-  return `<svg viewBox="0 0 400 150" style="width:100%;height:100%">
-    <g stroke="${C('lilac')}" stroke-width="1" fill="none">
-      <path d="M60 75 Q90 40 200 38 Q330 40 350 66 Q355 75 350 84 Q330 110 200 112 Q90 110 60 75 Z"/>
-      <path d="M60 75 L120 70 L120 80 Z" fill="${C('peri')}" opacity="0.5"/>
-      <ellipse cx="200" cy="75" rx="40" ry="18"/>
-      <rect x="150" y="46" width="110" height="8" rx="4"/>
-      <rect x="150" y="96" width="110" height="8" rx="4"/>
-    </g>
-    <g data-sys="bridge"    style="cursor:pointer"><circle cx="200" cy="58" r="5" fill="${C('gold')}"/><text x="208" y="52" font-size="7" fill="${C('lilac')}" font-family="Antonio">BRIDGE</text></g>
-    <g data-sys="core"      style="cursor:pointer"><circle cx="200" cy="82" r="5" fill="${C('salmon')}"><animate attributeName="opacity" values="1;.4;1" dur="2.2s" repeatCount="indefinite"/></circle><text x="170" y="130" font-size="7" fill="${C('lilac')}" font-family="Antonio">WARP CORE</text></g>
-    <g data-sys="deflector" style="cursor:pointer"><circle cx="85" cy="75" r="5" fill="${C('peri')}"/><text x="66" y="60" font-size="7" fill="${C('lilac')}" font-family="Antonio">DEFLECTOR</text></g>
-    <g data-sys="nacelles"  style="cursor:pointer"><circle cx="205" cy="100" r="5" fill="${C('peach')}"/><text x="240" y="120" font-size="7" fill="${C('lilac')}" font-family="Antonio">NACELLES</text></g>
-  </svg>`;
-}
 const SYS_FLAVOR = {
   bridge:    ['MAIN BRIDGE', 'COMMAND FUNCTIONS NOMINAL<br>DECK 1 · ALPHA SHIFT ON DUTY'],
   core:      ['MAIN ENGINEERING', 'REACTION STABLE · OUTPUT 92%<br>SEE HOLODECK · WARP CORE FOR OPERATIONS'],
@@ -217,13 +245,17 @@ function holoMSD(scr, x0, y0, x1, y1) {
     sx += w + 0.5;
   });
   const p = scr.panel(x0, y0 + 2.3, x1 - x0, y1 - y0 - 2.3);
-  const C = k => getComputedStyle(document.documentElement).getPropertyValue('--c-' + k).trim();
-  if (!ship.built) {
+  if (!ship.img) {
     p.innerHTML = `<div class="clb" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%">
       <div class="standby">■ ${msdShip}</div><div style="opacity:.6;margin-top:.6em">AWAITING SCHEMATIC · DRAFTING QUEUE</div></div>`;
     return;
   }
-  p.innerHTML = `<div class="feed" style="border-color:transparent">${ship.draw(C)}</div>`;
+  /* real cutaway + percentage-positioned tap spots (pulse on their own tempos) */
+  p.innerHTML = `<div class="feed" style="border-color:transparent">
+    <div class="msd-wrap"><img class="msd-img" src="${ship.img}" alt="${msdShip}">
+    ${ship.spots.map(s => `<div class="msd-spot" data-sys="${s.sys}"
+      style="left:${s.x}%;top:${s.y}%;animation-duration:${(2 + Math.random() * 1.6).toFixed(1)}s"></div>`).join('')}
+    </div></div>`;
   p.querySelectorAll('[data-sys]').forEach(el => el.addEventListener('pointerup', () => {
     SFX.play('beep');
     const [t, body] = SYS_FLAVOR[el.dataset.sys];
@@ -249,14 +281,14 @@ function holoTactical(scr, x0, y0, x1, y1) {
     TORPEDO BAY <span class="v">LOADED · 3</span><br><span class="w">SIMULATION — NO REAL SYSTEMS</span></div>`;
   const tac = tgt.querySelector('#tac');
   scr.onTap(wp.querySelector('#tac-ph'), () => {
-    SFX.play('phaser');
+    SFX.play('phaser'); fireHook('holo.phaser');
     const beam = document.createElement('div'); beam.className = 'tac-beam';
     tac.appendChild(beam); setTimeout(() => beam.remove(), 700);
     document.getElementById('tac-status').textContent = 'PHASERS FIRING — DIRECT HIT';
     setTimeout(() => { const s = document.getElementById('tac-status'); if (s) s.textContent = 'TARGET LOCK · SIMULATED CONTACT'; }, 1800);
   });
   scr.onTap(wp.querySelector('#tac-tp'), () => {
-    SFX.play('torpedo');
+    SFX.play('torpedo'); fireHook('holo.torpedo');
     const t = document.createElement('div'); t.className = 'tac-torp';
     tac.appendChild(t); setTimeout(() => t.remove(), 1100);
     document.getElementById('tac-status').textContent = 'TORPEDO AWAY';
