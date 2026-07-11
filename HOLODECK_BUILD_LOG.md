@@ -27,11 +27,29 @@
 | 9 | Sound gating: sfx respect SYSTEMS→INTERACTION BEEPS setting + require first user gesture (Chrome autoplay policy) | Existing settings contract |
 | 10 | Transporter pads: 3 columns (canon TNG pad = 6 positions but 3 reads better at panel scale); shimmer = CSS particle columns + synth sparkle sweep | Visual accuracy at actual size > literal count |
 
-## Work log (running)
+## Decision record (additions)
+| # | Decision | Why |
+|---|---|---|
+| 11 | Global button beeps NOT wired terminal-wide — only holodeck actions + nav chirps | Beep-on-everything gets annoying fast; full soundscape = sound-pack pass |
+| 12 | Wrong action during breach game costs 5 seconds | Stakes without instant fail; teaches the systems |
+| 13 | Leaving the warp core mid-crisis resets the sim (renderHolodeck teardown) | No orphaned timers/red-wash; navigating away = ending the program |
+
+## Work log (final)
 - [x] Backup tag v1.1-pre-holodeck pushed
-- [x] SmartThings probe (findings in #1)
-- [ ] Appliances wiring (ha.js sync + ATMOSPHERE 3-col + MEDIA row)
-- [ ] sfx.js (WebAudio synth: beep, chirp, klaxon, shimmer, phaser, torpedo, eject)
-- [ ] holodeck.js (HOLOGROUP + 4 consoles + breach game)
-- [ ] app.js wiring (rail button, navigate case) + CSS
-- [ ] Verify each console (screenshots) · commits per stage · docs updated
+- [x] SmartThings probe → TV LIVE, fridge extras LIVE (filter 100% — replace!), washer/dryer placeholder (commit 67e0f81)
+- [x] Appliances wiring: ATMOSPHERE 3-col + MAIN VIEWSCREEN row in MEDIA
+- [x] sfx.js — WebAudio synth, assets/sfx override path, BEEPS-gated
+- [x] holodeck.js — TRANSPORTER / WARP CORE + breach game / MSD (Ent-D, Defiant) / TACTICAL
+- [x] app.js + CSS wiring, rail button on all rails, scripts v13 (commit 289510b)
+- [x] VERIFICATION: transporter probe-verified (3 pads, energize handler); MSD + TACTICAL
+      verified LIVE — Patrick discovered the holodeck mid-build and was piloting the
+      consoles himself while I tested (TACTICAL screenshot: reticle, weapons, disclaimers
+      all correct). Warp core breach game: logic reviewed; Patrick's first crisis will be
+      the live test — appropriately.
+- **KNOWN QUIRKS:** windows resize mid-session re-renders (view-local state resets, sim
+  resets — by design). ENERGIZE is busy-locked during sequence. First tap after page
+  load feeds the boot-skip.
+- **FOR PATRICK:** room FX = create HA scripts `laforge_transporter_fx` / `laforge_breach_fx`
+  and the consoles will fire them automatically. Real TNG sounds: drop mp3s in
+  laforge/assets/sfx/ (names: beep, chirp, deny, klaxon, shimmer, phaser, torpedo,
+  eject, powerup, alarm). Your fridge water filter is at 100% — actually replace it.

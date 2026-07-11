@@ -425,6 +425,18 @@ adding real devices (TP-Link/Tuya) + the floor plan himself later tonight.
   full shakedown pass (walk every screen/view hunting rough edges) → THEN declare
   deployable → Fred serving-origin decision + deploy + kiosk Cesium perf test.
   Post-deploy backlog: floor plan SVG, Majel voice, HOLODECK, sound pack.
+- **AUTONOMOUS SESSION 2026-07-11 (Patrick-directed, no check-ins; full record in
+  HOLODECK_BUILD_LOG.md):** backup tag `v1.1-pre-holodeck` → SmartThings states
+  (TV 85" LIVE incl. MEDIA row + ATMOSPHERE panel; fridge doors/filter/energy LIVE —
+  FILTER AT 100%, REPLACE; Bespoke washer/dryer placeholder, hookup =
+  DATA.appliances.washer) → **HOLODECK v1 SHIPPED** (commits 67e0f81 + 289510b):
+  gold rail button on all rails; TRANSPORTER (energize sequence + shimmer synth +
+  script.laforge_transporter_fx hook); WARP CORE (pulsing shaft, eject/recover/vent/
+  realign, BREACH GAME: 4 incidents / 20s / wrong = −5s / timeout = SHIP LOST, local
+  red wash only); MSD (Ent-D + Defiant SVG elevations, tappable systems → gold
+  popups; 3 ships in drafting queue); TACTICAL (starfield, phaser/torpedo anims);
+  sfx.js WebAudio synthesis w/ assets/sfx/*.mp3 override path. Verified live —
+  Patrick was flying the consoles himself before the build was even committed.
 - **KIOSK HARDWARE (Patrick, 2026-07-04):** Surface Pro 4 — containerized/isolated
   Win10 OR compatible Linux distro. GPU = Intel HD 520 (Skylake iGPU): CesiumJS-capable
   at panel res, but budget it — `requestRenderMode:true` (render on demand), resolution
