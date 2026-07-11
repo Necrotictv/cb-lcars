@@ -82,6 +82,7 @@ function render() {
   const W = UNITS_WIDE, H = Math.floor(scr.uh * 4) / 4;
   if (current === 'main') renderMain(scr, W, H);
   else if (current === 'systems') renderSystems(scr, W, H);
+  else if (current === 'holodeck') renderGroup(scr, W, H, HOLOGROUP);
   else renderGroup(scr, W, H, GROUPS.find(g => g.id === current));
   lastScr = scr;
   if (needsBoot) { needsBoot = false; playBoot(scr); }
@@ -121,6 +122,12 @@ function railSystems(scr, y, bh) {
   scr.text(0, y + bh - 0.75, RAIL - 0.25, 0.75, 'SYSTEMS',
     { fs:'data', color:'black', align:'right', weight:600 }).style.pointerEvents = 'none';
 }
+function railHolodeck(scr, y, bh) {   // recreation deck: rail access, not a cluster
+  const b = scr.bar(0, y, RAIL, bh, 'gold', { top:true });
+  scr.onTap(b, () => { SFX.play('chirp'); navigate('holodeck'); });
+  scr.text(0, y + bh - 0.75, RAIL - 0.25, 0.75, 'HOLODECK',
+    { fs:'data', color:'black', align:'right', weight:600 }).style.pointerEvents = 'none';
+}
 function railMode(scr, y, bh) {
   const muted = LCARS.settings.get('micMute', false);
   const b = scr.bar(0, y, RAIL, bh, muted ? 'lilac' : 'gold', { top:true });
@@ -139,7 +146,8 @@ function renderMain(scr, W, H) {
   scr.text(0, EH + 1.75, RAIL - 0.25, 0.75, 'LCARS 47-2210', { fs:'data', color:'black', align:'right', weight:600 });
   railSystems(scr, EH + 2.5, 2.5);
   railMode(scr, EH + 5, 2.5);
-  const ry = EH + 7.5;
+  railHolodeck(scr, EH + 7.5, 2.5);
+  const ry = EH + 10;
   scr.bar(0, ry, RAIL, (H - EH) - ry, 'peach', { top:true, bottom:true });
   scr.text(0, H - EH - 1, RAIL - 0.25, 0.75, '490-0504', { fs:'data', color:'black', align:'right', weight:600 });
 
@@ -238,7 +246,8 @@ function renderGroup(scr, W, H, g) {
   /* rail blocks joining lower elbow down to the bottom elbow — live controls */
   railSystems(scr, dy2 + DEH, 2.5);
   railMode(scr, dy2 + DEH + 2.5, 2.5);
-  const ry = dy2 + DEH + 5;
+  railHolodeck(scr, dy2 + DEH + 5, 2.5);
+  const ry = dy2 + DEH + 7.5;
   scr.bar(0, ry, RAIL, (H - EH) - ry, 'peach', { top:true, bottom:true });
 
   /* segmented divider tube (both halves share widths/colors — V4 technique),
@@ -569,6 +578,7 @@ function searchBox(host, placeholder, onGo) {
 }
 
 function renderWorkspace(scr, g, view, x0, y0, x1, y1) {
+  if (g.id === 'holodeck') { renderHolodeck(scr, view, x0, y0, x1, y1); return; }
   const key = g.id + ':' + ((g.local ?? [])[view] ?? '');
   const cols = defs => wsCols(scr, x0, y0, x1, y1, defs);
   switch (key) {
@@ -586,18 +596,30 @@ function renderWorkspace(scr, g, view, x0, y0, x1, y1) {
         POWER DRAW <span class="v">142 W</span><br>LAST EVENT <span class="v">KITCHEN 90%</span></div>`;
       break; }
     case 'environ:ATMOSPHERE': {
-      const [cc, cs] = cols([['canary','CLIMATE CONTROL'], ['peri','COLD STORAGE']]);
+      const [cc, cs, ap] = cols([['canary','CLIMATE CONTROL'], ['peri','COLD STORAGE'], ['gold','APPLIANCES']]);
       /* AC/thermostat: standby until climate entities exist in HA */
       cc.innerHTML = `<div class="clb" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%">
         <div class="standby">■ STANDBY</div>
-        <div style="opacity:.6;margin-top:.6em">AWAITING CLIMATE ENTITIES · AC / THERMOSTAT INTEGRATION</div></div>`;
+        <div style="opacity:.6;margin-top:.6em">AWAITING CLIMATE ENTITIES · AC / THERMOSTAT</div></div>`;
       /* cold storage = life support flavor on REAL refrigerator sensors */
       const rf = id => Math.round(HA.num('sensor.refrigerator_' + id, 0) * 10) / 10;
+      const A = DATA.appliances ?? {};
       cs.innerHTML = `<div class="clb">
-        FRIDGE <span class="v">${rf('fridge_temperature') || 37}°F</span><br>
-        FREEZER <span class="v">${rf('freezer_temperature') || 0}°F</span><br>
+        FRIDGE <span class="v">${rf('fridge_temperature') || 37}°F</span> ·
+        DOOR ${A.fridgeDoor ? '<span class="w">OPEN</span>' : '<span class="v">SEALED</span>'}<br>
+        FREEZER <span class="v">${rf('freezer_temperature') || 0}°F</span> ·
+        DOOR ${A.freezerDoor ? '<span class="w">OPEN</span>' : '<span class="v">SEALED</span>'}<br>
         POWER DRAW <span class="v">${rf('power') || '—'} W</span><br>
-        ENERGY Δ <span class="v">${rf('energy_difference') || '—'} KWH</span></div>`;
+        WATER FILTER ${(A.filterPct ?? 0) >= 100
+          ? '<span class="w">' + Math.round(A.filterPct) + '% · REPLACE</span>'
+          : '<span class="v">' + Math.round(A.filterPct ?? 0) + '% USED</span>'}</div>`;
+      /* SmartThings: TV live; Bespoke washer/dryer = hookup placeholder */
+      ap.innerHTML = `<div class="clb">
+        MAIN VIEWSCREEN 85″ <span class="v">${(A.tvState ?? 'UNKNOWN').toUpperCase()}</span><br>
+        LAST SIGNAL <span class="v">${A.tvChan ?? '—'}</span><br><br>
+        BESPOKE WASHER/DRYER<br>
+        <span class="w">AWAITING SMARTTHINGS UPLINK</span><br>
+        <span style="opacity:.55">HOOKUP: DATA.appliances.washer (ha.js)</span></div>`;
       break; }
     case 'environ:SHUTTERS': {
       workspaceStandby(scr, x0, y0, x1, y1, g, 'SHUTTER CONTROL · AWAITING COVER ENTITIES (BLINDS)');
