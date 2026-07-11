@@ -131,11 +131,24 @@ const HA = (() => {
     ];
 
     D.media = [
+      ['MAIN VIEWSCREEN · 85"', st('media_player.living_room_85_crystal_uhd')?.state ?? 'unknown',
+        Math.round((st('media_player.living_room_85_crystal_uhd')?.attributes?.volume_level ?? 0) * 10)],
       ['DOWNSTAIRS',  st('media_player.downstairs')?.state ?? 'unknown',        num('number.downstairs_volume', 6)],
       ['EVERYWHERE',  st('media_player.everywhere')?.state ?? 'unknown',        5],
       ['BEDROOM · P', st('media_player.patrick_s_bedroom')?.state ?? 'unknown', 4],
       ['IZZY’S ROOM', st('media_player.izzy_s_room')?.state ?? 'unknown',       3],
     ];
+
+    /* SmartThings appliances (probed 2026-07-11): TV live, fridge extras live,
+       Bespoke washer/dryer NOT in HA yet → UI shows AWAITING UPLINK placeholder */
+    D.appliances = {
+      tvState: st('media_player.living_room_85_crystal_uhd')?.state ?? 'unknown',
+      tvChan:  st('sensor.living_room_85_crystal_uhd_tv_channel_name')?.state ?? '—',
+      fridgeDoor:  st('binary_sensor.refrigerator_fridge_door')?.state === 'on',
+      freezerDoor: st('binary_sensor.refrigerator_freezer_door')?.state === 'on',
+      filterPct:   num('sensor.refrigerator_water_filter_usage', 0),
+      washer: null,   // ← hookup point: Bespoke washer/dryer entities when integrated
+    };
 
     hooks.onUpdate?.(full);
   }
