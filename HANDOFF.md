@@ -30,6 +30,8 @@ alert modes), and will run on a wall-mounted Surface Pro 4 kiosk.
 | `app.js` | screens, navigation, workspaces, boot, screensaver, alert visuals, HA hookup |
 | `ha.js` | HA websocket client: auth, state sync, service calls |
 | `floorplan.js` | data-driven house plan (MSD) — rooms are a plain array, edit freely |
+| `sfx.js` | WebAudio SFX synthesis; `assets/sfx/<name>.mp3` auto-overrides; BEEPS-gated |
+| `holodeck.js` | theatrical consoles (SIMULATION ONLY) — see HOLODECK_BUILD_LOG.md |
 | `config.local.js` | **GITIGNORED** — HA url + long-lived token. NEVER COMMIT. Source: `UberMegaVault/_system/credentials/secrets.yaml` |
 | `assets/` | FedSign.gif (screensaver); ufp_spin.mp4 goes here when Patrick supplies it |
 | `science_mock.html` | reference mock (kept for comparison) |
@@ -70,8 +72,28 @@ He gives feedback bluntly and warmly; when he says "Bravo," bank the pattern tha
   persisted in localStorage `laforge-settings`).
 - **Dev keys**: G = grid overlay, S = screensaver, B = boot replay.
 
+### Shipped AFTER this document was first written (v1.0 → v1.2, all verified):
+- **Camera live feeds** — signed camera_proxy stills (HA.signPath); SECURITY panels @5s,
+  main thumbs @10s, tap → viewscreen @2s. HLS upgrade path noted in PROJECT_MEMORY.
+- **MSD room popups** — floor-plan rooms → live entity panels; per-domain controls;
+  sirens need 2-tap CONFIRM.
+- **Real 5-day forecast** (weather.get_forecasts + return_response) · live cats/litter ·
+  update.* enumeration · science sensor-target search (Nominatim → Cesium flyTo /
+  Windy re-center).
+- **Viewscreen popups = TRUE LCARS mini-frames** — UI_STANDARDS §9 LOCKED (segmented
+  rail, corner sweeps, context colors; alerts recolor open popups).
+- **ENVIRONMENTAL spoke** absorbed LIGHTS (locked decision #6 updated below).
+- **SmartThings**: 85" TV live (MEDIA + ATMOSPHERE), fridge doors/filter/energy live,
+  Bespoke washer/dryer hookup point = `DATA.appliances.washer` (ha.js).
+- **HOLODECK v1 BUILT** (rail button, gold): TRANSPORTER (energize + shimmer +
+  `script.laforge_transporter_fx` hook), WARP CORE + breach game (local red wash ONLY —
+  never the house alert), MSD (Ent-D/Defiant SVGs; 3 ships in drafting queue),
+  TACTICAL (phaser/torpedo). ALL simulation; decision record = HOLODECK_BUILD_LOG.md.
+  Patrick LOVES this ("exactly what I am going for") — protect it accordingly.
+
 ## 4. THE MILESTONE LOCK (revert procedure)
-An annotated git tag **`v1.0-fable`** marks this exact state. It is pushed to origin
+Tags: **`v1.0-fable`** (the original milestone) and **`v1.1-pre-holodeck`**
+(before the 7/11 autonomous session). Both pushed to origin
 (github.com/Necrotictv/cb-lcars). **To revert everything to this milestone:**
 ```bash
 git checkout main
@@ -172,27 +194,21 @@ tokens and his patience. Change only if HE asks.
 7. When uncertain about intent — ask Patrick (one question), don't guess and build.
 8. End every session by updating `PROJECT_MEMORY.md`'s rolling log + NEXT section.
 
-## 9. ROADMAP (Patrick wants "most complex first" on resume)
-**Functional queue (in rough complexity order, hardest first):**
-1. **Camera live feeds** — HA `camera_proxy` stills → upgrade to HLS/WebRTC streams;
-   render in SECURITY·CAMERAS panels + `viewscreen()` popup for full view. (Complex:
-   stream auth from a standalone origin.)
-2. **Serving-origin decision + Fred deploy** — nginx container (Portainer @ 10.0.0.75)
-   vs HA `/config/www/` (same-origin websocket = simpler auth). Then kiosk Cesium perf
-   test on the Surface Pro 4.
-3. **MSD room popups** — tap a room on the HOME floor plan → popup with that room's
-   entities (floorplan.js already carries per-room entity lists).
-4. **weather.get_forecasts service** → replace the mock 5-day strip.
-5. **Remaining sensor reads** — litter robot, update.* entities, network speeds.
-6. **Sweet Home 3D floor plan SVG** — Patrick supplies to `laforge/assets/`; becomes the
-   MSD base layer (floorplan.js stays as the dot/tap overlay).
-7. **Patrick supplies `assets/ufp_spin.mp4`** (yt-dlp one-liner in PROJECT_MEMORY) —
-   screensaver auto-upgrades.
-8. **Sound pack** — hooks exist (SYSTEMS audio flags, onTap, boot). LCARdS sound assets
-   are candidates; wire beeps/ambient/alert klaxon.
-**Then:** HOLODECK vault (LAFORGE_DESIGN) — transporter room, ship MSDs, warp core +
-breach game. **Stretch:** ASTROMETRICS embeds, flight radar, traffic cams, Majel voice
-(TTS Voice Lab tie-in), OPNSense/ntopng data for CORE·NETWORK.
+## 9. ROADMAP (updated 2026-07-11 — items 1/3/4/5 + holodeck v1 are DONE)
+**Pre-deployment:**
+1. **Patrick's incoming tweaks** — he said "more tweaks soon"; they take priority.
+2. **Interactive MEDIA volume sliders** (drag → media_player.volume_set /
+   number.set_value; reuse the dimmer drag pattern).
+3. **Shakedown pass** — walk every screen/view/popup hunting rough edges.
+4. **Serving-origin decision + Fred deploy** — nginx container (Portainer @ 10.0.0.75)
+   vs HA `/config/www/` (same-origin websocket = simpler auth). Then kiosk Cesium
+   perf test on the Surface Pro 4. Camera stills → HLS upgrade if choppy.
+**Post-deployment (Patrick's explicit ordering):**
+real floor plan (Sweet Home 3D SVG → laforge/assets/, MSD base layer) · Majel voice
+(TTS Voice Lab tie-in) · HOLODECK expansion (Excelsior/DS9/Voyager MSDs, CONN console,
+room-FX scripts, real TNG sounds via assets/sfx/) · LIGHTS scenes (needs HA scenes) ·
+ufp_spin.mp4 for the saver · sound pack completion · ASTROMETRICS embeds, flight radar,
+traffic cams · OPNSense/ntopng for CORE·NETWORK.
 
 ## 10. RUNBOOK
 - **Serve**: `python -m http.server 8000` in the project root (Zeke). Terminal at
