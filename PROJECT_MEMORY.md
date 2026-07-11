@@ -413,11 +413,13 @@ adding real devices (TP-Link/Tuya) + the floor plan himself later tonight.
   rail, 0.9u title bar, 0.5u bottom bar, 1u outer sweeps, 0.5u concave webs, open right
   side, salmon cap CLOSE). Context colors: salmon=security, peri=rooms, lilac=science.
   Palette-role based → alerts recolor open popups. VERIFIED on live night cam feed.
-- **ENVIRONMENTAL SPOKE LOGGED, NOT BUILT (2026-07-09):** Patrick wants LIGHTS absorbed
-  into ENVIRONMENTAL (AC, room lighting, blinds — actuation; SCIENCE keeps observation).
-  Full spec in LAFORGE_DESIGN. A first-pass implementation was built then CLEANLY
-  REVERTED on his "log it, don't do it yet" (git-verified byte-identical). Build on
-  his green-light only.
+- **ENVIRONMENTAL SPOKE BUILT (2026-07-10, green-lit by Patrick re-requesting):**
+  LIGHTS retired → ENVIRONMENTAL (canary, same slot, 3×2 intact). Views: LIGHTING
+  (ex-LIGHTS·ALL, dimmers/switches/flood), ATMOSPHERE (climate standby + LIVE cold
+  storage: fridge/freezer temps, power draw — refrigerator sensors), SHUTTERS (standby,
+  awaiting cover.*), SCENES. INTERIOR/EXTERIOR mock views dropped (were filters).
+  Main cluster: 3 dimmer bars + cold-storage line. VERIFIED live (fridge 37°F/0°F/151W).
+  Old localView 'lights' keys orphaned harmlessly. HANDOFF locked-decision #6 updated.
 - **SESSION PAUSE (2026-07-09, Patrick at limit).** RESUME AT: interactive MEDIA volume
   sliders (drag → media_player.volume_set / number.set_value, reuse dimmer drag code) →
   full shakedown pass (walk every screen/view hunting rough edges) → THEN declare

@@ -95,8 +95,10 @@ tokens and his patience. Change only if HE asks.
    flat fills (no gradients/glow), rounded cap = button, thick→thin frame rule.
 5. **Main = Glance Grid** (3×2, sacred); **nav = hub-and-spoke** (subscreens go back to
    MAIN only); **SYSTEMS/MODE are rail buttons, not spokes**.
-6. **Spokes**: LIGHTS canary, SECURITY salmon, SCIENCE lilac, MEDIA magenta, HOME peri,
-   CORE peach. Views per spoke = LAFORGE_DESIGN spoke map.
+6. **Spokes**: ENVIRONMENTAL canary (absorbed LIGHTS 2026-07-10 — views LIGHTING/
+   ATMOSPHERE/SHUTTERS/SCENES; SCIENCE observes, ENVIRONMENTAL controls), SECURITY
+   salmon, SCIENCE lilac, MEDIA magenta, HOME peri, CORE peach. Views per spoke =
+   LAFORGE_DESIGN spoke map.
 7. **Palettes are role tables** (peach/lilac/peri/gold/salmon/canary/magenta/orange).
    `classic` (thelcars.com values) is Patrick's preferred. redalert/yellowalert are
    system palettes (never in the picker, never persisted).

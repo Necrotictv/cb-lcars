@@ -24,7 +24,10 @@ const DTH = 0.5, DEH = 2.75;   // subscreen divider arm thickness / elbow box he
 /* local = screen-specific nav (hub-and-spoke model: subscreens navigate only
    back to MAIN; the top row belongs to THIS screen's own views instead) */
 const GROUPS = [
-  { id:'lights',   label:'LIGHTS',   color:'canary',  badge:'3/5 ON',   local:['ALL','INTERIOR','EXTERIOR','SCENES'] },
+  /* ENVIRONMENTAL absorbed LIGHTS (2026-07-10): starships have Environmental
+     Control, not a "lights station." SCIENCE observes; ENVIRONMENTAL controls. */
+  { id:'environ',  label:'ENVIRONMENTAL', color:'canary', badge:'3/5 ON',
+    local:['LIGHTING','ATMOSPHERE','SHUTTERS','SCENES'] },
   { id:'security', label:'SECURITY', color:'salmon',  badge:'GREEN',    local:['CAMERAS','PERIMETER','ALERTS'] },
   { id:'science',  label:'SCIENCE',  color:'lilac',   badge:'71°F',     local:['ATMOS','SURVEY','ORBITAL','GEO'] },
   { id:'media',    label:'MEDIA',    color:'magenta', badge:'IDLE',     local:['PLAYERS','ANNOUNCE','VOLUME'] },
@@ -156,7 +159,7 @@ function renderMain(scr, W, H) {
 
   /* badges compute from DATA so live values show without code changes */
   const badges = {
-    lights: (DATA.floodOn ? '4/5' : '3/5') + ' ON', security: alertLabel(),
+    environ: (DATA.floodOn ? '4/5' : '3/5') + ' ON', security: alertLabel(),
     science: DATA.climate.temp + '°F', media: 'IDLE',
     home: '2 EVENTS', core: DATA.core.alarms === '0' ? 'NOMINAL' : 'ALARM',
   };
@@ -196,8 +199,9 @@ function renderMain(scr, W, H) {
 
 function clusterBody(id) {
   switch (id) {
-    case 'lights': return DATA.dimmers.map(([k,v]) => `
-      <div class="mb"><div class="k">${k}</div><div class="t"><i style="width:${v}%"></i></div><div class="n">${v||'OFF'}</div></div>`).join('');
+    case 'environ': return DATA.dimmers.slice(0, 3).map(([k,v]) => `
+      <div class="mb"><div class="k">${k}</div><div class="t"><i style="width:${v}%"></i></div><div class="n">${v||'OFF'}</div></div>`).join('') +
+      `COLD STORAGE <span class="v">${Math.round(HA.num('sensor.refrigerator_fridge_temperature', 37))}° / ${Math.round(HA.num('sensor.refrigerator_freezer_temperature', 0))}°F</span>`;
     case 'security': return `
       <div class="cams">` + DATA.cams.map(([n], i) =>
         `<div class="cam" data-n="${n}"><img class="camimg" id="camthumb-${i}" alt=""><i class="scan"></i></div>`).join('') + `</div>
@@ -569,8 +573,8 @@ function renderWorkspace(scr, g, view, x0, y0, x1, y1) {
   const cols = defs => wsCols(scr, x0, y0, x1, y1, defs);
   switch (key) {
 
-    /* ---------------- LIGHTS ---------------- */
-    case 'lights:ALL': {
+    /* ---------------- ENVIRONMENTAL (absorbed LIGHTS 2026-07-10) ---------------- */
+    case 'environ:LIGHTING': {
       const [dim, sw, st] = cols([['canary','DIMMERS'], ['peach','SWITCHES'], ['lilac','STATUS']]);
       buildDimmers(dim, [0, 1, 2, 3]);
       /* BACKYARD FLOOD = the first REAL control: light.toggle on a physical device */
@@ -581,18 +585,24 @@ function renderWorkspace(scr, g, view, x0, y0, x1, y1) {
       st.innerHTML = `<div class="clb">BACKYARD FLOOD <span class="v">${DATA.floodOn ? 'ON' : 'OFF'}</span><br>
         POWER DRAW <span class="v">142 W</span><br>LAST EVENT <span class="v">KITCHEN 90%</span></div>`;
       break; }
-    case 'lights:INTERIOR': {
-      const [dim, sc] = cols([['canary','DIMMERS · INTERIOR'], ['lilac','QUICK SCENES']]);
-      buildDimmers(dim, [0, 1, 2]);
-      btns(scr, sc, [['lilac','EVENING'], ['magenta','MOVIE'], ['peri','ALL INTERIOR OFF']]);
+    case 'environ:ATMOSPHERE': {
+      const [cc, cs] = cols([['canary','CLIMATE CONTROL'], ['peri','COLD STORAGE']]);
+      /* AC/thermostat: standby until climate entities exist in HA */
+      cc.innerHTML = `<div class="clb" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%">
+        <div class="standby">■ STANDBY</div>
+        <div style="opacity:.6;margin-top:.6em">AWAITING CLIMATE ENTITIES · AC / THERMOSTAT INTEGRATION</div></div>`;
+      /* cold storage = life support flavor on REAL refrigerator sensors */
+      const rf = id => Math.round(HA.num('sensor.refrigerator_' + id, 0) * 10) / 10;
+      cs.innerHTML = `<div class="clb">
+        FRIDGE <span class="v">${rf('fridge_temperature') || 37}°F</span><br>
+        FREEZER <span class="v">${rf('freezer_temperature') || 0}°F</span><br>
+        POWER DRAW <span class="v">${rf('power') || '—'} W</span><br>
+        ENERGY Δ <span class="v">${rf('energy_difference') || '—'} KWH</span></div>`;
       break; }
-    case 'lights:EXTERIOR': {
-      const [fl, st] = cols([['canary','FLOOD CONTROL'], ['lilac','PERIMETER STATUS']]);
-      btns(scr, fl, [['canary','BACKYARD FLOOD'], ['peri','DUSK-TO-DAWN · AUTO']]);
-      st.innerHTML = `<div class="clb">BACKYARD FLOOD <span class="v">OFF</span><br>
-        LAST MOTION <span class="v">BACKYARD 19:42</span><br>SUNSET TRIGGER <span class="v">20:31</span></div>`;
+    case 'environ:SHUTTERS': {
+      workspaceStandby(scr, x0, y0, x1, y1, g, 'SHUTTER CONTROL · AWAITING COVER ENTITIES (BLINDS)');
       break; }
-    case 'lights:SCENES': {
+    case 'environ:SCENES': {
       const [sc, inf] = cols([['canary','SCENE SELECT'], ['lilac','SCENE DETAIL']]);
       btns(scr, sc, [['lilac','EVENING'], ['magenta','MOVIE'], ['gold','GOODNIGHT'], ['peri','ALL OFF']]);
       inf.innerHTML = `<div class="clb">EVENING <span class="v">LIVING 40 · FOYER 25</span><br>

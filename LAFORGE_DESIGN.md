@@ -159,7 +159,7 @@ tiers verified live 2026-07-04).
    on demand.
 4. Coordinates come from HA `zone.home` (mock used guessed Cincinnati coords).
 
-### ENVIRONMENTAL SPOKE (Patrick, 2026-07-09 — LOGGED, NOT YET BUILT)
+### ENVIRONMENTAL SPOKE (Patrick 2026-07-09 — **BUILT 2026-07-10, green-lit**)
 **The plan:** LIGHTS is absorbed into a new **ENVIRONMENTAL** spoke (canary, same
 cluster slot — the sacred 3×2 survives). Thematic split: **SCIENCE observes the
 environment, ENVIRONMENTAL controls it.** Canon rationale: starships have
