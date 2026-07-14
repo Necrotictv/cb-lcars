@@ -31,10 +31,13 @@ const LCARS = (() => {
        come from screen-accurate curation, ours from compressed frames. */
     classic: { peach:'#f86', lilac:'#c9f', peri:'#89f', gold:'#fc9',
                salmon:'#cf4f4f', canary:'#fc3', magenta:'#cf5e9e', orange:'#f90' },
-    ds9: { peach:'#ffaa55', lilac:'#bb8877', peri:'#8899bb', gold:'#ffbb33',
-           salmon:'#bb5544', canary:'#ddcc77', magenta:'#aa6688', orange:'#ff9900' },
-    voy: { peach:'#ffb380', lilac:'#b0a0dd', peri:'#7f96d4', gold:'#e6c97a',
-           salmon:'#c76b6b', canary:'#e8e08a', magenta:'#b05fa0', orange:'#ffaa33' },
+    /* ds9/voy RETUNED 2026-07-14 against lcars.org.uk templates (images/adge/):
+       DS9 = sand/tan rails + hot gold; VOY = the true magenta/pink identity
+       with warm rails + pale blue info. Vetting notes in LAFORGE_DESIGN. */
+    ds9: { peach:'#ffb066', lilac:'#d4b183', peri:'#8899bb', gold:'#ffbb33',
+           salmon:'#bb5544', canary:'#e8cc88', magenta:'#b07a88', orange:'#ff9900' },
+    voy: { peach:'#f2a25c', lilac:'#cc99cc', peri:'#9bb2e8', gold:'#e6c97a',
+           salmon:'#d4707a', canary:'#eed488', magenta:'#ff88cc', orange:'#ffaa33' },
     /* SYSTEM palettes — alert conditions hue-shift the whole terminal
        (the LCARdS trick, done natively). Not shown in the SYSTEMS picker;
        applied temporarily, never saved to settings. */
