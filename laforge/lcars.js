@@ -185,11 +185,15 @@ const LCARS = (() => {
     scr.elbow = (x, y, { corner='tl', tv=1.5, th=1.1, ro=2, ri=1, w=3.5, h=3.5, color='lilac' }) => {
       [tv,th,ro,ri,w,h] = [tv,th,ro,ri,w,h].map(v => snap(v,'elbow-param'));
       const P = n => U(n);
-      const path = corner === 'tl'
+      /* tr/br = horizontal mirrors of tl/bl (needed for scanWindow's
+         double-bracket — the mirrored-elbow signature, UI_STANDARDS ref) */
+      const base = (corner === 'tl' || corner === 'tr')
         ? `M0 ${P(h)} L${P(tv)} ${P(h)} L${P(tv)} ${P(th+ri)} Q${P(tv)} ${P(th)} ${P(tv+ri)} ${P(th)} L${P(w)} ${P(th)} L${P(w)} 0 L${P(ro)} 0 Q0 0 0 ${P(ro)} Z`
         : `M0 0 L${P(tv)} 0 L${P(tv)} ${P(h-th-ri)} Q${P(tv)} ${P(h-th)} ${P(tv+ri)} ${P(h-th)} L${P(w)} ${P(h-th)} L${P(w)} ${P(h)} L${P(ro)} ${P(h)} Q0 ${P(h)} 0 ${P(h-ro)} Z`;
+      const mirror = (corner === 'tr' || corner === 'br')
+        ? ` transform="translate(${U(w)},0) scale(-1,1)"` : '';
       const d = scr.place(x, y, w, h);
-      d.innerHTML = `<svg width="${U(w)}" height="${U(h)}" viewBox="0 0 ${U(w)} ${U(h)}" style="display:block"><path d="${path}" fill="${COLORS[color] ?? color}"/></svg>`;
+      d.innerHTML = `<svg width="${U(w)}" height="${U(h)}" viewBox="0 0 ${U(w)} ${U(h)}" style="display:block"><path d="${base}"${mirror} fill="${COLORS[color] ?? color}"/></svg>`;
       return d;
     };
 
@@ -289,8 +293,38 @@ const LCARS = (() => {
     return scr;
   }
 
+  /* ---- lcarsGraph: the VOY energy-flow display as a reusable component ----
+     (spec: LAFORGE_DESIGN / images/adge/voy_energy_flow) black field, magenta
+     mesh, neon traces w/ value labels RIDING the lines, auto-scale header.
+     Pure canvas draw — caller re-invokes on each new sample. */
+  function drawGraph(canvas, series, { window: win = 90, unit = '', title = '' } = {}) {
+    const ctx = canvas.getContext('2d');
+    canvas.width = canvas.clientWidth; canvas.height = canvas.clientHeight;
+    const W = canvas.width, H = canvas.height;
+    const mx = Math.max(10, ...series.flatMap(s => s.data));
+    ctx.strokeStyle = COLORS.magenta; ctx.globalAlpha = 0.22; ctx.lineWidth = 1;
+    for (let x = 0; x <= W; x += W / 12) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+    for (let y = 0; y <= H; y += H / 6)  { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+    for (const s of series) {
+      const col = COLORS[s.color] ?? s.color;
+      ctx.strokeStyle = col; ctx.lineWidth = 1.8; ctx.shadowColor = col; ctx.shadowBlur = 5;
+      ctx.beginPath();
+      s.data.forEach((v, i) => { const x = i / (win - 1) * W, y = H - (v / mx) * (H - 12) - 4;
+        i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+      ctx.stroke(); ctx.shadowBlur = 0;
+      const lv = s.data[s.data.length - 1] ?? 0;
+      ctx.fillStyle = col; ctx.font = '600 10px Antonio';
+      ctx.fillText(`${s.label} ${Math.round(lv)}${unit}`,
+        Math.min((s.data.length - 1) / (win - 1) * W, W - 64),
+        Math.max(10, H - (lv / mx) * (H - 12) - 8));
+    }
+    ctx.fillStyle = COLORS.lilac; ctx.font = '600 9px Antonio';
+    ctx.fillText(`${title ? title + ' · ' : ''}SCALE ${Math.round(mx)}${unit}`, 6, 11);
+  }
+
   /* boot with the persisted palette (default TNG) */
   setPalette(settings.get('palette', 'tng'));
 
-  return { screen, COLORS, PALETTES, setPalette, settings, SEAM, GAP };
+  return { screen, COLORS, PALETTES, setPalette, settings, drawGraph, SEAM, GAP };
 })();

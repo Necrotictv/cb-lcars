@@ -445,6 +445,29 @@ function buildDimmers(panel, idxs) {
   });
 }
 
+/* scanWindow: the canonical LCARS sensor display (spec: LAFORGE_DESIGN,
+   ref images/adge/ds9_scan_analysis). Signature = DOUBLE-BRACKET: mirrored
+   elbows flanking the data field, title bar top, params bar bottom.
+   Returns the body panel for content (canvas, readouts, whatever). */
+function scanWindow(scr, x, y, w, h, { title, code = '', color = 'lilac' } = {}) {
+  const T = 0.75, B = 0.5, BR = 1.25;              // title / params / bracket widths
+  scr.shape(x, y, w, T, { capLeft:true, capRight:true, color });
+  scr.text(x + 0.75, y, w - 4, T, title, { fs:'data', color:'black', weight:700 });
+  if (code) scr.text(x, y, w - 0.75, T, code, { fs:'data', color:'black', align:'right', weight:700 });
+  const by = y + T + 0.25, bh = h - T - B - 0.5;
+  const eb = { tv:0.5, th:0.5, ro:0.75, ri:0.25, w:BR, h:1.25, color };
+  scr.elbow(x, by, { corner:'tl', ...eb });                       // left bracket
+  scr.bar(x, by + 1.25, 0.5, bh - 2.5, color, { top:true, bottom:true });
+  scr.elbow(x, by + bh - 1.25, { corner:'bl', ...eb });
+  scr.elbow(x + w - BR, by, { corner:'tr', ...eb });              // right bracket (mirrored)
+  scr.bar(x + w - 0.5, by + 1.25, 0.5, bh - 2.5, color, { top:true, bottom:true });
+  scr.elbow(x + w - BR, by + bh - 1.25, { corner:'br', ...eb });
+  scr.shape(x, y + h - B, w, B, { capLeft:true, capRight:true, color:'peri' });
+  scr.text(x, y + h - B, w - 0.75, B, 'SCAN PARAMETERS · ' + (code || '0000'),
+    { fs:'data', color:'black', align:'right', weight:600 });
+  return scr.panel(x + BR + 0.25, by, w - 2 * BR - 0.5, bh);
+}
+
 const btns = (scr, panel, items) => {   // items: [color, text, action?] — action fires a real service call
   panel.innerHTML = `<div class="btncol">` + items.map(([c, t]) =>
     `<div class="wbtn" style="background:var(--c-${c})">${t}</div>`).join('') + `</div>`;
@@ -932,12 +955,32 @@ function renderWorkspace(scr, g, view, x0, y0, x1, y1) {
 
     /* ---------------- CORE ---------------- */
     case 'core:FRED': {
-      const [g1, al] = cols([['peach','FRED · WARP CORE'], ['salmon','ALARMS']]);
-      g1.innerHTML = `<div class="clb">` + [['CPU',34], ['MEMORY',61], ['LOAD',28], ['DISK I/O',12]]
-        .map(([n, v]) => `<div class="mb"><div class="k" style="width:calc(var(--u)*4.5)">${n}</div>
-          <div class="t"><i style="width:${v}%;background:var(--c-peach)"></i></div><div class="n">${v}</div></div>`).join('') + `</div>`;
-      al.innerHTML = `<div class="clb"><span class="w">1 ACTIVE</span> · SMART WARN · SDB<br><br>
-        BACKUP <span class="v">OK · 03:00</span><br>UPTIME <span class="v">21 DAYS</span></div>`;
+      /* BOTH new components live: scanWindow wrapping a live lcarsGraph */
+      const wL = Math.floor((x1 - x0) * 0.66 * 4) / 4;
+      const body = scanWindow(scr, x0, y0, wL, y1 - y0,
+        { title:'DIAGNOSTIC SCAN · FRED WARP CORE', code:'47-291', color:'peach' });
+      body.innerHTML = `<canvas id="fredgraph" style="width:100%;height:100%;display:block"></canvas>`;
+      const cpuH = [], memH = [];
+      const samp = () => {
+        const cv = document.getElementById('fredgraph'); if (!cv) return;
+        cpuH.push(HA.num('sensor.fred_cpu_usage', 5 + Math.random() * 10));
+        memH.push(DATA.core.mem || 30);
+        if (cpuH.length > 90) { cpuH.shift(); memH.shift(); }
+        LCARS.drawGraph(cv, [
+          { data: cpuH, color:'#7fe08a', label:'CPU' },
+          { data: memH, color:'magenta', label:'MEM' },
+        ], { unit:'%', title:'CORE TELEMETRY' });
+      };
+      samp(); later(samp, 2000);
+      const dxF = x0 + wL + GAP;
+      const [al] = wsCols(scr, dxF, y0, x1, y1, [['salmon','ALARMS']]);
+      const alarms = DATA.core.alarms === '0' ? '<span class="v">CLEAR</span>'
+        : `<span class="w">${DATA.core.alarms}</span>`;
+      al.innerHTML = `<div class="clb">ALARMS ${alarms}<br><br>
+        CPU <span class="v">${Math.round(DATA.core.cpu)}%</span><br>
+        MEMORY <span class="v">${DATA.core.memLabel ?? '—'}</span><br>
+        NET IN <span class="v">${Math.round(HA.num('sensor.fred_net_in', 0))}</span> ·
+        OUT <span class="v">${Math.round(HA.num('sensor.fred_net_out', 0))}</span></div>`;
       break; }
     case 'core:NETWORK': {
       const [wan, lan] = cols([['peach','WAN · SUBSPACE LINK'], ['peri','LAN']]);

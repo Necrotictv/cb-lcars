@@ -437,6 +437,16 @@ adding real devices (TP-Link/Tuya) + the floor plan himself later tonight.
   popups; 3 ships in drafting queue); TACTICAL (starfield, phaser/torpedo anims);
   sfx.js WebAudio synthesis w/ assets/sfx/*.mp3 override path. Verified live —
   Patrick was flying the consoles himself before the build was even committed.
+- **SESSIONS 7/14 (commits d722bbc→bee77b0):** Adge template crawl (12 refs in
+  images/adge/, scanWindow + lcarsGraph specs) · ds9/voy palettes RETUNED (VOY =
+  magenta/pink identity — Patrick-approved) · LIVE lcarsGraph prototype on EPS page
+  (real WAN traces, rider labels) · CAMERA STREAMING: HLS path built + honest
+  rapid-stills fallback (1.2s). **FINDING: Ring-family cams reject camera/stream —
+  their live view = WebRTC (camera/webrtc/offer), QUEUED as the real upgrade; HLS
+  path auto-upgrades any future RTSP cam.** ws send() now surfaces HA errors
+  (was silently resolving undefined — correctness fix for all calls).
+  NEXT: WebRTC camera flow → promote lcarsGraph()+scanWindow() into lcars.js →
+  MEDIA volume sliders → shakedown → Fred deploy.
 - **KIOSK HARDWARE (Patrick, 2026-07-04):** Surface Pro 4 — containerized/isolated
   Win10 OR compatible Linux distro. GPU = Intel HD 520 (Skylake iGPU): CesiumJS-capable
   at panel res, but budget it — `requestRenderMode:true` (render on demand), resolution
