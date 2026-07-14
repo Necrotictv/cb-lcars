@@ -37,14 +37,19 @@ const HA = (() => {
 
   function send(m) {
     m.id = msgId++; ws.send(JSON.stringify(m));
-    return new Promise(res => pending[m.id] = res);
+    return new Promise((res, rej) => pending[m.id] = { res, rej });
   }
 
   function handle(m) {
     if (m.type === 'auth_required') ws.send(JSON.stringify({ type:'auth', access_token: cfg.token }));
     else if (m.type === 'auth_ok') { setStatus(true); bootstrap(); }
     else if (m.type === 'auth_invalid') console.error('[HA] AUTH INVALID — regenerate token');
-    else if (m.type === 'result' && pending[m.id]) { pending[m.id](m.result); delete pending[m.id]; }
+    else if (m.type === 'result' && pending[m.id]) {
+      /* surface HA errors instead of resolving undefined (found via camera/stream) */
+      if (m.success === false) pending[m.id].rej?.(new Error(m.error?.message ?? 'HA error'));
+      else pending[m.id].res ? pending[m.id].res(m.result) : pending[m.id](m.result);
+      delete pending[m.id];
+    }
     else if (m.type === 'event' && m.event?.event_type === 'state_changed') {
       const s = m.event.data.new_state;
       if (s) { states[s.entity_id] = s; sync(false); }
@@ -168,6 +173,15 @@ const HA = (() => {
   }
   const cameraUrl = entityId => signPath('/api/camera_proxy/' + entityId);
 
-  return { init, call, st, num, signPath, cameraUrl,
+  /* true live video: HA transmuxes the camera to HLS and returns a signed
+     playlist URL. Some cameras (cloud/Ring) take seconds to spin up. */
+  async function cameraStream(entityId) {
+    if (!connected) return null;
+    try { const r = await send({ type:'camera/stream', entity_id: entityId });
+      return cfg.haUrl + r.url; } catch (e) {
+      console.warn('[HA] stream unavailable for', entityId, e); return null; }
+  }
+
+  return { init, call, st, num, signPath, cameraUrl, cameraStream,
     get connected() { return connected; }, get states() { return states; } };
 })();

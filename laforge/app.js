@@ -533,19 +533,43 @@ function viewscreen(title, contentHTML, onClose, color = 'lilac') {
   return v;
 }
 
-/* live camera viewscreen: signed-URL stills on a fast refresh. Own interval,
-   cleared on close (popup outlives render() so timers[] can't own it). */
+/* camera viewscreen: TRUE LIVE VIDEO via HLS (camera/stream + hls.js),
+   graceful fallback to 2s signed stills if the stream won't start.
+   Cleanup on close: hls destroyed + still-timer cleared (popup outlives render). */
 function camPopup(name, entity) {
+  let hls = null, t = null;
   const v = viewscreen('VIEWSCREEN · ' + name + ' · LIVE FEED',
-    `<img class="campop" alt="ACQUIRING SIGNAL…">`,
-    () => clearInterval(t), 'salmon');            // security context = salmon frame
-  const img = v.querySelector('img');
-  const refresh = async () => {
-    const u = await HA.cameraUrl(entity);
-    if (u && img.isConnected) img.src = u;
-  };
-  refresh();
-  const t = setInterval(refresh, 2000);
+    `<video class="campop" autoplay muted playsinline></video>
+     <div class="cam-mode" id="cam-mode">ACQUIRING SIGNAL…</div>`,
+    () => { clearInterval(t); try { hls?.destroy(); } catch {} }, 'salmon');
+  const vid = v.querySelector('video');
+  const mode = txt => { const m = v.querySelector('#cam-mode'); if (m) m.textContent = txt; };
+
+  function fallbackStills() {
+    try { hls?.destroy(); } catch {} hls = null;
+    const img = document.createElement('img');
+    img.className = 'campop'; vid.replaceWith(img);
+    const refresh = async () => { const u = await HA.cameraUrl(entity);
+      if (u && img.isConnected) img.src = u; };
+    refresh(); t = setInterval(refresh, 1200);
+    mode('RAPID STILLS · 1.2S');
+  }
+
+  (async () => {
+    const url = await HA.cameraStream(entity);
+    if (!url) return fallbackStills();
+    try {
+      await loadScript('https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js');
+      if (window.Hls?.isSupported()) {
+        hls = new Hls({ liveDurationInfinity: true, lowLatencyMode: true });
+        hls.loadSource(url); hls.attachMedia(vid);
+        hls.on(Hls.Events.FRAG_LOADED, () => mode('◉ LIVE STREAM'));
+        hls.on(Hls.Events.ERROR, (_, d) => { if (d.fatal) fallbackStills(); });
+      } else if (vid.canPlayType('application/vnd.apple.mpegurl')) {
+        vid.src = url; mode('◉ LIVE STREAM');
+      } else fallbackStills();
+    } catch { fallbackStills(); }
+  })();
 }
 
 const homeGeo = () => DATA.geo ?? { lat: 39.1, lon: -84.5 };   // zone.home via ha.js

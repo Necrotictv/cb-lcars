@@ -34,6 +34,9 @@
   /* live still feeds: fill the frame, keep the scan sweep on top for the vibe */
   .camimg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.92}
   .campop{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000}
+  .cam-mode{position:absolute;top:8px;right:12px;z-index:4;font-family:Antonio;
+    font-size:calc(var(--u)*0.4);color:var(--c-salmon,#f55);letter-spacing:.15em;
+    text-transform:uppercase;animation:fbspin 3s ease-in-out infinite}
   .cam:nth-child(1) .scan{animation-duration:4.2s}
   .cam:nth-child(2) .scan{animation-duration:5.7s;animation-delay:1.3s}
   .cam:nth-child(3) .scan{animation-duration:3.4s;animation-delay:2.1s}
@@ -257,11 +260,11 @@
 <!-- config.local.js is GITIGNORED (HA token); absent = simulated mode.
      ?v= version query = cache-bust (bump when shipping to the kiosk/Fred) -->
 <script src="config.local.js" onerror="console.warn('[LaForge] no local config — simulated mode')"></script>
-<script src="lcars.js?v=15"></script>
-<script src="floorplan.js?v=15"></script>
-<script src="ha.js?v=15"></script>
-<script src="sfx.js?v=15"></script>
-<script src="holodeck.js?v=15"></script>
-<script src="app.js?v=15"></script>
+<script src="lcars.js?v=17"></script>
+<script src="floorplan.js?v=17"></script>
+<script src="ha.js?v=17"></script>
+<script src="sfx.js?v=17"></script>
+<script src="holodeck.js?v=17"></script>
+<script src="app.js?v=17"></script>
 </body>
 </html>
