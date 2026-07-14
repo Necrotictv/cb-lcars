@@ -214,6 +214,39 @@ but control nothing that matters. The room becomes the set.
 - **ASTROMETRICS** (chetwode?) — star maps / solar system embeds, flight radar, traffic cams
 - SYSTEMS is NOT a spoke — it's terminal chrome (rail button), config only.
 
+## ADGE TEMPLATE LIBRARY (lcars.org.uk crawl, 2026-07-14 — Patrick-directed)
+Reference set downloaded to `images/adge/` (12 files: DS9 scan analysis, intermix,
+Defiant status/red alert, battle lines, stellar cartography, VOY subspace scan,
+energy flow, vessel status, molecular, emissions scan, red alert).
+
+### Component patterns extracted (specs for future builds):
+1. **SCAN WINDOW** (ref: ds9_scan_analysis) — the canonical "sensor detail" display:
+   data area DOUBLE-BRACKETED (mirrored elbows LEFT AND RIGHT — the signature),
+   title bar top ("SCAN ANALYSIS nnnn"), params bar bottom, black field with
+   center crosshair + tick rulers, symmetric spectrum mass in magenta/violet/blue.
+   → build as reusable `scanWindow()` component. Homes: SECURITY camera analysis,
+   SCIENCE sensor detail, ORBITAL body popups, HOLODECK scans.
+2. **LCARS LINE GRAPH** (ref: voy_energy_flow, voy_subspace_scan) — black field,
+   MAGENTA/PINK mesh grid (optionally perspective-skewed), 2–3 neon traces
+   (green/cyan/pink) with small data labels riding the lines, title + analysis-code
+   bars. → build as `lcarsGraph()` canvas component. Homes: WAN history (EPS page),
+   CPU/temp history (CORE·FRED), forecast trends (SCIENCE·ATMOS).
+3. **INTERMIX / core displays** (ds9_intermix) — reference for WARP CORE view chrome.
+4. **RED ALERT screens** (ds9_defiant_redalert, voy_redalert) — reference for
+   alert-condition full-screen treatments + breach-game visuals.
+5. **VESSEL STATUS** (voy_vessel_status) — MSD + status readout composition,
+   reference for HOLODECK MSD detail panels.
+
+### Palette vetting vs the templates (PROPOSED — sweeping, needs Patrick sign-off):
+- **DS9**: templates run TAN/SAND + GOLD frames with lilac & rose accents; data in
+  magenta/blue. Our `ds9` palette is close but should push sand (≈#ddbb88) and
+  keep gold hot; rose-tan stays.
+- **VOY**: templates are far more MAGENTA/HOT-PINK than our blue-violet `voy`
+  palette — pink data fields + warm peach/tan rails + pale blue accents.
+  Proposed: bump magenta family (≈#ff88cc data accent), warm the rails.
+- TRANSPORTER SLIDERS: no dedicated template found on these pages this pass —
+  Patrick's reference gif remains the canonical source (already implemented).
+
 ## ROUTINE HOOKS — how Patrick connects the interface to real-world effects
 **(built 2026-07-12; this is the user manual)**
 1. In HA: create a **script** or **scene** (or automation) that does the thing —
