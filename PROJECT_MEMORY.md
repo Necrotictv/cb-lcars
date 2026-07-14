@@ -247,6 +247,37 @@ adding real devices (TP-Link/Tuya) + the floor plan himself later tonight.
 - To remove: delete `automation.lcars_red_alert_on_siren` (Settings → Automations) and the alert-row from the
   DIRECT CONTROL section.
 
+### 2026-07-14 — SHAKEDOWN PASS (full-site QA sweep) — 1 critical bug, 2 upgrades, all screens clean
+- **Instrumented QA walk built + run:** JS harness drives every screen + local view via the real
+  pointerup path (nav pills only — never device controls), scanning each state for JS errors,
+  NaN/undefined text leaks, layout overflow, dead images, and stuck fades. **33/33 states visited,
+  ZERO errors, ZERO leaks.** (Harness gotcha: button caps are SVG children — find pills via label
+  rect → `elementFromPoint` → computed cursor, dispatch bubbling pointerdown+up.)
+- **🐛 CRITICAL FIX — hidden-tab navigation freeze.** `navigate()` relied on the fade-out's
+  `onfinish` to call `render()`; Chrome pauses the animation timeline in hidden tabs, so onfinish
+  never fired → every navigation silently swallowed + screen stuck mid-fade (the "dim screenshot
+  ghost" finally explained). Kiosk impact: screen blank / tab switch mid-fade = frozen terminal.
+  Fix: watchdog timeout guarantees render; `document.hidden` path skips the fade entirely; piled-up
+  fill:forwards animations cancelled per nav (leak); visibilitychange handler snaps stuck fades clear.
+- **LCARS scrollbars:** stock gray Chrome scrollbars showed in scrolling panels (ROUTINE
+  ASSIGNMENTS) — now slim peri thumb on transparent track, global.
+- **Bespoke washer WENT LIVE in HA** (between 7/11 and 7/14 — found during sweep): full entity set
+  (machine_state, job_state, power, completion_time, cycle selects). Wired into ha.js
+  `D.appliances.washer` + ATMOSPHERE APPLIANCES panel shows CYCLE / job / COMPLETE hh:mm / POWER W.
+  Placeholder remains only as offline fallback. (Dryer entities not seen yet — combo unit reports as washer.)
+- **Dimmer honesty:** LIVING/FOYER/KITCHEN bulbs verified NOT in HA (only `light.backyard_light`
+  exists) — mock dimmers now carry the `·SIM` tag (same convention as pre-wiring cameras) on both
+  the main tile and the LIGHTING sliders. Wire + de-tag when Tuya bulbs reach HA.
+- **False alarms verified OK:** cam thumbs blank only during initial URL signing; ROUTINE list
+  scrolls correctly (rects past viewport = below-the-fold scroll content); LUNA 0% = actual new
+  moon; darker pills = breathe() mid-pulse. Patrick-side notes: fridge filter still 100%·REPLACE,
+  Arris upload sensor reads 0 (`NET OUT 0`), `media_player.downstairs` UNAVAILABLE in HA.
+- **⚠️ INCIDENT (repeat of 7/03 sed lesson, now ABSOLUTE):** a `sed -i` through the sandbox mount
+  TRUNCATED main.html mid-line (Drive sync race). Recovered via `git checkout -- laforge/main.html`
+  + re-applied edits with file tools. **RULE: NEVER write vault files via bash mount. File tools or
+  PowerShell only. Bash mount = read-only.**
+- Cache: main.html now loads app.js + ha.js at `?v=20`.
+
 ### 2026-07-03 — Project LaForge named; layout methodology LOCKED (design reevaluation session)
 - **Codename Project_LaForge** applied to the custom-renderer build (folder/repo names unchanged).
 - **Invisible grid LOCKED** into UI_STANDARDS §4: 0.25u snap for all element x/y/w/h; two gap

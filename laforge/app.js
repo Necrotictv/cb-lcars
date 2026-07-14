@@ -39,7 +39,10 @@ const GROUPS = [
    them with live HA state when config.local.js provides a token. ---- */
 const DATA = {
   cams: [ ['FRONT DOOR', null, '—'], ['BACKYARD', null, '—'], ['DOWNSTAIRS', null, '—'] ],
-  dimmers: [ ['LIVING',72], ['FOYER',45], ['KITCHEN',90], ['BACKYD',0] ],
+  /* 3rd field = live-wired to an HA entity. Living/foyer/kitchen bulbs are NOT
+     in HA yet (verified 7/14: only light.backyard_light exists) — honesty rule:
+     simulated readouts carry the SIM tag, same as cameras did pre-wiring. */
+  dimmers: [ ['LIVING',72,false], ['FOYER',45,false], ['KITCHEN',90,false], ['BACKYD',0,true] ],
   core:    { cpu:34, mem:61, alarms:'1' },
   climate: { temp:71, condition:'CLEAR', humidity:44, wind:4, sunset:'20:31', sunrise:'05:48' },
   alert:   'green_alert',
@@ -57,12 +60,29 @@ const later = (fn, ms) => timers.push(setInterval(fn, ms));
    matter-of-fact — TNG screens CUT, they don't cross-dissolve for drama. */
 function navigate(to) {
   current = to;
-  root.animate([{opacity:1},{opacity:0}], {duration:110, fill:'forwards'})
-    .onfinish = () => {
-      render();
+  /* SHAKEDOWN FIX (2026-07-14): hidden tabs pause the animation timeline, so
+     onfinish never fires and the render silently dies — on the kiosk that means
+     screen-blank/tab-switch mid-fade = frozen terminal. The render must NEVER
+     depend on an animation completing: a watchdog guarantees it, and when the
+     page is hidden we skip the theater entirely (nobody's watching). */
+  let done = false;
+  const go = () => {
+    if (done) return; done = true;
+    /* cancel piled-up fill:forwards animations (they persist per nav — leak) */
+    root.getAnimations().forEach(a => a.cancel());
+    render();
+    if (!document.hidden)
       root.animate([{opacity:0},{opacity:1}], {duration:160, fill:'forwards'});
-    };
+  };
+  if (document.hidden) { go(); return; }
+  root.animate([{opacity:1},{opacity:0}], {duration:110, fill:'forwards'}).onfinish = go;
+  setTimeout(go, 300);                       // watchdog: fires even if the fade can't
 }
+/* if the page comes back to visibility stuck mid-fade (edge race), snap clear */
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && parseFloat(getComputedStyle(root).opacity) < 1)
+    root.getAnimations().forEach(a => a.cancel());
+});
 
 let needsBoot = true;   // boot choreography plays exactly once, on first load
 let lastScr = null;     // kept for dev tools (B = replay boot, for testing/filming)
@@ -207,8 +227,8 @@ function renderMain(scr, W, H) {
 
 function clusterBody(id) {
   switch (id) {
-    case 'environ': return DATA.dimmers.slice(0, 3).map(([k,v]) => `
-      <div class="mb"><div class="k">${k}</div><div class="t"><i style="width:${v}%"></i></div><div class="n">${v||'OFF'}</div></div>`).join('') +
+    case 'environ': return DATA.dimmers.slice(0, 3).map(([k,v,live]) => `
+      <div class="mb"><div class="k">${k}${live ? '' : ' <span class="w" style="opacity:.6">·S</span>'}</div><div class="t"><i style="width:${v}%"></i></div><div class="n">${v||'OFF'}</div></div>`).join('') +
       `COLD STORAGE <span class="v">${Math.round(HA.num('sensor.refrigerator_fridge_temperature', 37))}° / ${Math.round(HA.num('sensor.refrigerator_freezer_temperature', 0))}°F</span>`;
     case 'security': return `
       <div class="cams">` + DATA.cams.map(([n], i) =>
@@ -426,9 +446,10 @@ function wsCols(scr, x0, y0, x1, y1, defs) {
 /* interactive transporter dimmers for a subset of DATA.dimmers (by index).
    Phase 2: the set() handler is where light.turn_on{brightness} goes. */
 function buildDimmers(panel, idxs) {
-  panel.innerHTML = `<div class="slrow">` + idxs.map(i => { const [k, v] = DATA.dimmers[i]; return `
+  panel.innerHTML = `<div class="slrow">` + idxs.map(i => { const [k, v, live] = DATA.dimmers[i]; return `
     <div class="vsl" data-i="${i}"><div class="vtrack"><div class="vfill" style="height:${v}%"></div>
-    <div class="vhandle" style="bottom:${v}%"></div></div><div class="vval">${v||'OFF'}</div><div class="vlab">${k}</div></div>`; }).join('') + `</div>`;
+    <div class="vhandle" style="bottom:${v}%"></div></div><div class="vval">${v||'OFF'}</div>
+    <div class="vlab">${k}${live ? '' : ' <span class="w" style="opacity:.6">·SIM</span>'}</div></div>`; }).join('') + `</div>`;
   panel.querySelectorAll('.vsl').forEach(sl => {
     const track = sl.querySelector('.vtrack');
     const set = e => {
@@ -711,13 +732,18 @@ function renderWorkspace(scr, g, view, x0, y0, x1, y1) {
         WATER FILTER ${(A.filterPct ?? 0) >= 100
           ? '<span class="w">' + Math.round(A.filterPct) + '% · REPLACE</span>'
           : '<span class="v">' + Math.round(A.filterPct ?? 0) + '% USED</span>'}</div>`;
-      /* SmartThings: TV live; Bespoke washer/dryer = hookup placeholder */
+      /* SmartThings: TV live; Bespoke washer went live 7/14 (shakedown find) */
+      const wm = A.washer;
+      const washerHtml = wm
+        ? `BESPOKE WASHER/DRYER<br>
+           CYCLE <span class="v">${wm.state}</span>${wm.job !== 'NONE' ? ' · <span class="v">' + wm.job + '</span>' : ''}<br>
+           ${wm.state === 'RUN' && wm.done ? 'COMPLETE <span class="v">' + wm.done + '</span><br>' : ''}
+           POWER DRAW <span class="v">${wm.power} W</span>`
+        : `BESPOKE WASHER/DRYER<br><span class="w">AWAITING SMARTTHINGS UPLINK</span>`;
       ap.innerHTML = `<div class="clb">
         MAIN VIEWSCREEN 85″ <span class="v">${(A.tvState ?? 'UNKNOWN').toUpperCase()}</span><br>
         LAST SIGNAL <span class="v">${A.tvChan ?? '—'}</span><br><br>
-        BESPOKE WASHER/DRYER<br>
-        <span class="w">AWAITING SMARTTHINGS UPLINK</span><br>
-        <span style="opacity:.55">HOOKUP: DATA.appliances.washer (ha.js)</span></div>`;
+        ${washerHtml}</div>`;
       break; }
     case 'environ:SHUTTERS': {
       workspaceStandby(scr, x0, y0, x1, y1, g, 'SHUTTER CONTROL · AWAITING COVER ENTITIES (BLINDS)');

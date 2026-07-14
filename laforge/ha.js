@@ -152,7 +152,16 @@ const HA = (() => {
       fridgeDoor:  st('binary_sensor.refrigerator_fridge_door')?.state === 'on',
       freezerDoor: st('binary_sensor.refrigerator_freezer_door')?.state === 'on',
       filterPct:   num('sensor.refrigerator_water_filter_usage', 0),
-      washer: null,   // ← hookup point: Bespoke washer/dryer entities when integrated
+      /* Bespoke washer — went live in HA between 7/11 and 7/14 (found during
+         shakedown): machine_state (stop/run/pause), job_state (wash/rinse/
+         spin/none), live power draw, and a completion timestamp. */
+      washer: st('sensor.laundry_room_washer_machine_state') ? {
+        state: (st('sensor.laundry_room_washer_machine_state')?.state ?? 'unknown').toUpperCase(),
+        job:   (st('sensor.laundry_room_washer_job_state')?.state ?? 'none').replace(/_/g, ' ').toUpperCase(),
+        power: num('sensor.laundry_room_washer_power', 0),
+        /* completion_time arrives as "MM/DD/YYYY HH:MM:SS" — show HH:MM */
+        done:  (st('sensor.laundry_room_washer_completion_time')?.state ?? '').split(' ')[1]?.slice(0, 5) ?? null,
+      } : null,
     };
 
     hooks.onUpdate?.(full);

@@ -10,6 +10,14 @@
   html,body{margin:0;height:100%;background:#000;overflow:hidden}
   #screen{width:100vw;height:100vh}
 
+  /* LCARS scrollbars (shakedown 2026-07-14): stock gray Chrome scrollbars broke
+     the aesthetic in scrolling panels (ROUTINE ASSIGNMENTS etc.). Slim peri
+     thumb on a transparent track — reads as a slider grip, not browser chrome. */
+  ::-webkit-scrollbar{width:calc(var(--u)*0.25);height:calc(var(--u)*0.25)}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:var(--c-peri,#9c9cff);border-radius:calc(var(--u)*0.125)}
+  ::-webkit-scrollbar-corner{background:transparent}
+
   /* cluster body text */
   .clb{padding:calc(var(--u)*0.4);font-size:calc(var(--u)*0.40);line-height:1.9;
     color:#d8c7ec;letter-spacing:.08em;text-transform:uppercase;height:100%;box-sizing:border-box}
@@ -262,9 +270,9 @@
 <script src="config.local.js" onerror="console.warn('[LaForge] no local config — simulated mode')"></script>
 <script src="lcars.js?v=18"></script>
 <script src="floorplan.js?v=18"></script>
-<script src="ha.js?v=18"></script>
+<script src="ha.js?v=20"></script>
 <script src="sfx.js?v=18"></script>
 <script src="holodeck.js?v=18"></script>
-<script src="app.js?v=18"></script>
+<script src="app.js?v=20"></script>
 </body>
 </html>
