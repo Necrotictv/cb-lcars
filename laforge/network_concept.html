@@ -33,7 +33,7 @@
     transition:height 1.6s ease}
   .gv{font-size:calc(var(--u)*0.62);color:var(--c-orange,#f90)}
   .gl{font-size:calc(var(--u)*0.38);color:var(--c-lilac,#c9f);letter-spacing:.12em}
-  #spark{width:100%;height:calc(var(--u)*3.2);display:block}
+  #spark{width:100%;height:calc(var(--u)*5.2);display:block}
 </style>
 </head>
 <body>
@@ -121,7 +121,7 @@ function render() {
   scr.shape(dx, cy0 + 3, wR, 1.1, { capRight:true, color:'peri' });
   scr.text(dx + 0.5, cy0 + 3, wR - 1, 1.1, 'WAN THROUGHPUT', { fs:'sub', color:'black', weight:600 });
   const gp = scr.panel(dx, cy0 + 4.35, wR, (cy1 - cy0 - 4.35) * 0.62);
-  gp.innerHTML = `<div class="gg">
+  gp.innerHTML = `<div class="gg" style="height:38%">
       <div class="g"><div class="gtrack"><div class="gfill" id="g-down" style="background:var(--c-canary)"></div></div>
         <div class="gv" id="v-down">—</div><div class="gl">DOWN MBPS</div></div>
       <div class="g"><div class="gtrack"><div class="gfill" id="g-up" style="background:var(--c-peach)"></div></div>
@@ -138,7 +138,7 @@ function render() {
 }
 
 /* ---- live loop: real sensors drive the grid ---- */
-const hist = [];
+const hist = [], histU = [];
 function tick() {
   const dn = HA.num('sensor.arris_tg4482a_download_speed', NaN);
   const up = HA.num('sensor.arris_tg4482a_upload_speed', NaN);
@@ -157,15 +157,38 @@ function tick() {
     (HA.st('binary_sensor.arris_tg4482a_wan_status')?.state === 'on' ? 'ONLINE' : (sim ? 'SIM' : 'CHECK'));
   document.getElementById('v-ip').textContent = HA.st('sensor.arris_tg4482a_external_ip')?.state ?? '—';
   hist.push(d); if (hist.length > 90) hist.shift();
-  /* sparkline */
+  histU.push(u2); if (histU.length > 90) histU.shift();
+  /* ═══ lcarsGraph prototype (spec: voy_energy_flow template) ═══
+     black field · magenta mesh grid · neon traces · labels riding the lines.
+     Promote into lcars.js as lcarsGraph() once blessed. */
   const cv = document.getElementById('spark'), ctx = cv.getContext('2d');
   cv.width = cv.clientWidth; cv.height = cv.clientHeight;
-  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--c-canary').trim() || '#fc3';
-  ctx.lineWidth = 1.5; ctx.beginPath();
-  const mx = Math.max(...hist, 1);
-  hist.forEach((v, i) => { const x = i / 89 * cv.width, y = cv.height - (v / mx) * (cv.height - 4) - 2;
-    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
-  ctx.stroke();
+  const CC = k => getComputedStyle(document.documentElement).getPropertyValue('--c-' + k).trim();
+  const Wc = cv.width, Hc = cv.height, mx = Math.max(...hist, ...histU, 10);
+  /* mesh */
+  ctx.strokeStyle = CC('magenta') || '#f8c'; ctx.globalAlpha = 0.22; ctx.lineWidth = 1;
+  for (let x = 0; x <= Wc; x += Wc / 12) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, Hc); ctx.stroke(); }
+  for (let y = 0; y <= Hc; y += Hc / 6)  { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(Wc, y); ctx.stroke(); }
+  ctx.globalAlpha = 1;
+  /* traces + rider labels (template: values ride ON the line) */
+  const trace = (data, color, label) => {
+    ctx.strokeStyle = color; ctx.lineWidth = 1.8;
+    ctx.shadowColor = color; ctx.shadowBlur = 5;
+    ctx.beginPath();
+    data.forEach((v, i) => { const x = i / 89 * Wc, y = Hc - (v / mx) * (Hc - 12) - 4;
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+    ctx.stroke(); ctx.shadowBlur = 0;
+    const lv = data[data.length - 1] ?? 0;
+    const lx = Math.min((data.length - 1) / 89 * Wc, Wc - 58);
+    const ly = Math.max(10, Hc - (lv / mx) * (Hc - 12) - 8);
+    ctx.fillStyle = color; ctx.font = '600 10px Antonio';
+    ctx.fillText(`${label} ${Math.round(lv)}`, lx, ly);
+  };
+  trace(hist,  '#7fe08a',            'DN');   // neon green (template data color)
+  trace(histU, CC('magenta') || '#f8c', 'UP');
+  /* scale label, top-left, template-style */
+  ctx.fillStyle = CC('lilac') || '#c9c'; ctx.font = '600 9px Antonio';
+  ctx.fillText(`SCALE ${Math.round(mx)} MBPS · 3 MIN`, 6, 11);
   /* conduit flow speeds: more Mbps = faster dashes (floor 0.4s, idle 8s) */
   const durFor = v => Math.max(0.4, 8 / (1 + v / 20)).toFixed(2) + 's';
   document.querySelectorAll('.flow[data-live="wan"]').forEach(p => p.style.setProperty('--dur', durFor(d + u2)));
