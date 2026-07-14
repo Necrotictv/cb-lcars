@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LaForge — EPS GRID concept (network traffic)</title>
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* CONCEPT: the home network as an EPS power-distribution okudagram.
+     Conduit dash-flow speed = live throughput. WAN + Fred data are REAL
+     (via ha.js); per-host talkers await ntopng. Ref: lcars_conduction_system.mp4 */
+  html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:Antonio}
+  #screen{width:100vw;height:100vh}
+  .clb{padding:calc(var(--u)*0.4);font-size:calc(var(--u)*0.40);line-height:1.9;
+    color:#d8c7ec;letter-spacing:.08em;text-transform:uppercase;height:100%;box-sizing:border-box}
+  .clb .v{color:var(--c-orange,#ff9c00)} .clb .w{color:var(--c-salmon,#cc6666)}
+  .standby{font-size:calc(var(--u)*0.5);color:var(--c-peach,#ff9966);letter-spacing:.2em}
+  /* conduits: base pipe + animated flow overlay (dash speed set per-conduit by JS) */
+  .pipe{fill:none;stroke:#2a2f45;stroke-width:5;stroke-linecap:round}
+  .flow{fill:none;stroke:var(--c-canary,#fc3);stroke-width:2.6;stroke-linecap:round;
+    stroke-dasharray:7 11;animation:eps linear infinite;
+    animation-duration:var(--dur,3s);filter:drop-shadow(0 0 2px rgba(255,204,60,.6))}
+  @keyframes eps{to{stroke-dashoffset:-72}}
+  .node{fill:#10131d;stroke:var(--c-peri,#89f);stroke-width:1;rx:5}
+  .nlabel{font-family:Antonio;font-size:6.5px;fill:var(--c-lilac,#c9f);letter-spacing:1px}
+  .nval{font-family:Antonio;font-size:5.5px;fill:var(--c-orange,#f90);letter-spacing:.5px}
+  .ndot{r:2.4}
+  /* twin WAN multimeters */
+  .gg{display:flex;gap:calc(var(--u)*1);height:52%;justify-content:center;padding-top:calc(var(--u)*0.4)}
+  .g{display:flex;flex-direction:column;align-items:center;gap:calc(var(--u)*0.2);width:calc(var(--u)*3.4)}
+  .gtrack{flex:1;width:100%;border:1px solid #39415e;border-radius:calc(var(--u)*0.25);
+    position:relative;overflow:hidden;background:repeating-linear-gradient(to top,transparent 0 7px,#12141c 7px 9px)}
+  .gfill{position:absolute;left:3px;right:3px;bottom:3px;height:2%;border-radius:3px;
+    transition:height 1.6s ease}
+  .gv{font-size:calc(var(--u)*0.62);color:var(--c-orange,#f90)}
+  .gl{font-size:calc(var(--u)*0.38);color:var(--c-lilac,#c9f);letter-spacing:.12em}
+  #spark{width:100%;height:calc(var(--u)*3.2);display:block}
+</style>
+</head>
+<body>
+<div id="screen"></div>
+<script src="config.local.js" onerror="console.warn('sim mode')"></script>
+<script src="lcars.js?v=14"></script>
+<script src="ha.js?v=14"></script>
+<script>
+'use strict';
+/* standalone concept shell (science_mock pattern) */
+const root = document.getElementById('screen');
+const { GAP } = LCARS;
+const RAIL = 6, BARH = 1.0, RO = 2, RI = 1, EW = 7.5, EH = 3.5;
+
+/* the grid topology — EDIT FREELY: nodes + orthogonal conduit routes.
+   live: 'wan'|'fred' animate from real sensors; others pulse gently */
+const NODES = [
+  { id:'wan',    x:150, y:14,  w:100, h:16, label:'SUBSPACE UPLINK · WAN' },
+  { id:'gw',     x:155, y:70,  w:90,  h:16, label:'GATEWAY · XFINITY' },
+  { id:'fred',   x:30,  y:140, w:80,  h:16, label:'FRED · PROXMOX' },
+  { id:'haos',   x:10,  y:205, w:60,  h:14, label:'HAOS · JARVIS' },
+  { id:'docker', x:85,  y:205, w:60,  h:14, label:'DOCKER VM' },
+  { id:'zeke',   x:165, y:140, w:70,  h:16, label:'ZEKE · DEV' },
+  { id:'tv',     x:270, y:140, w:96,  h:16, label:'VIEWSCREEN · 85″' },
+  { id:'cams',   x:190, y:205, w:74,  h:14, label:'VISUAL SENSORS ×3' },
+  { id:'echo',   x:290, y:205, w:66,  h:14, label:'COMMS · ECHO ×4' },
+];
+const PIPES = [   // [from, to, orthogonal path, liveKey]
+  ['wan','gw',   'M200 30 L200 70', 'wan'],
+  ['gw','fred',  'M155 78 L80 78 Q70 78 70 88 L70 140', 'fred'],
+  ['gw','zeke',  'M200 86 L200 140', null],
+  ['gw','tv',    'M245 78 L308 78 Q318 78 318 88 L318 140', 'tv'],
+  ['fred','haos','M55 156 L55 176 Q55 186 45 186 L40 186 L40 205', 'fred2'],
+  ['fred','docker','M85 156 L85 176 Q85 186 95 186 L112 186 L112 205', null],
+  ['gw','cams',  'M215 86 L215 176 Q215 186 220 186 L227 186 L227 205', 'cam'],
+  ['gw','echo',  'M230 86 L230 120 L323 120 L323 205', null],
+];
+
+function render() {
+  root.innerHTML = '';
+  const u = root.clientWidth / 50;
+  document.documentElement.style.setProperty('--u', u + 'px');
+  const scr = LCARS.screen(root, { u });
+  const W = 50, H = Math.floor(scr.uh * 4) / 4;
+
+  /* CORE-flavored single frame */
+  scr.elbow(0, 0, { corner:'tl', tv:RAIL, th:BARH, ro:RO, ri:RI, w:EW, h:EH, color:'peach' });
+  scr.bar(EW, 0, 2, BARH, 'gold', { left:true });
+  scr.bar(EW + 2, 0, W - EW - 2 - 16 - 1.5, BARH, 'lilac', { left:true });
+  scr.text(W - 17.5, 0, 15.5, BARH, 'U.S.S. JARVIS · EPS DISTRIBUTION GRID', { fs:'sub', color:'orange', align:'right', weight:600 });
+  scr.shape(W - 1.5, 0, 1.5, BARH, { capRight:true, color:'peri' });
+  scr.bar(0, EH, RAIL, 2.5, 'peri', { top:true });
+  scr.text(0, EH + 1.75, RAIL - 0.25, 0.75, 'EPS GRID', { fs:'data', color:'black', align:'right', weight:700 });
+  scr.bar(0, EH + 2.5, RAIL, (H - EH) - (EH + 2.5) + EH - EH, 'peach', { top:true, bottom:true });
+  scr.bar(0, EH + 2.5, RAIL, (H - 2 * EH) - 2.5, 'peach', { top:true, bottom:true });
+  scr.elbow(0, H - EH, { corner:'bl', tv:RAIL, th:BARH, ro:RO, ri:RI, w:EW, h:EH, color:'peach' });
+  scr.text(EW + 0.25, H - BARH, 10, BARH, 'CONSOLE · ENGINEERING', { fs:'sub', color:'orange', weight:600 });
+  scr.bar(EW + 10.5, H - BARH, W - EW - 10.5 - 1.5, BARH, 'lilac', { left:true });
+  scr.shape(W - 1.5, H - BARH, 1.5, BARH, { capRight:true, color:'peri' });
+
+  const cx0 = RAIL + GAP, cx1 = W - GAP, cy0 = BARH + GAP, cy1 = H - BARH - GAP;
+  scr.text(cx1 - 16, cy0, 16, 0.5, 'ENGINEERING', { fs:'data', color:'orange', align:'right', ls:'.2em' });
+  scr.text(cx1 - 16, cy0 + 0.5, 16, 2.25, 'EPS GRID', { fs:'title', color:'orange', align:'right', weight:700 });
+
+  /* left: the grid */
+  const wG = Math.floor((cx1 - cx0) * 0.66 * 4) / 4;
+  scr.shape(cx0, cy0 + 3, wG, 1.1, { capRight:true, color:'peach' });
+  scr.text(cx0 + 0.5, cy0 + 3, 24, 1.1, 'POWER · DATA DISTRIBUTION NETWORK', { fs:'sub', color:'black', weight:600 });
+  const grid = scr.panel(cx0, cy0 + 4.35, wG, cy1 - cy0 - 4.35);
+  const C = k => getComputedStyle(document.documentElement).getPropertyValue('--c-' + k).trim();
+  grid.innerHTML = `<svg viewBox="0 0 400 235" style="width:100%;height:100%" preserveAspectRatio="xMidYMid meet">
+    ${PIPES.map(([f, t, d, live]) =>
+      `<path class="pipe" d="${d}"/><path class="flow" data-live="${live ?? ''}" d="${d}"
+        style="--dur:${live ? '3s' : (6 + Math.random() * 4).toFixed(1) + 's'};opacity:${live ? 1 : 0.45}"/>`).join('')}
+    ${NODES.map(n => `<g>
+      <rect class="node" x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="5"/>
+      <text class="nlabel" x="${n.x + 5}" y="${n.y + 10}">${n.label}</text>
+      <circle class="ndot" cx="${n.x + n.w - 7}" cy="${n.y + n.h / 2}" fill="${C('canary')}" data-dot="${n.id}">
+        <animate attributeName="opacity" values="1;.35;1" dur="${(2 + Math.random() * 2).toFixed(1)}s" repeatCount="indefinite"/></circle>
+      <text class="nval" x="${n.x + 5}" y="${n.y + n.h + 8}" data-val="${n.id}"></text></g>`).join('')}
+  </svg>`;
+
+  /* right: WAN multimeters + history + talkers */
+  const dx = cx0 + wG + GAP, wR = cx1 - dx;
+  scr.shape(dx, cy0 + 3, wR, 1.1, { capRight:true, color:'peri' });
+  scr.text(dx + 0.5, cy0 + 3, wR - 1, 1.1, 'WAN THROUGHPUT', { fs:'sub', color:'black', weight:600 });
+  const gp = scr.panel(dx, cy0 + 4.35, wR, (cy1 - cy0 - 4.35) * 0.62);
+  gp.innerHTML = `<div class="gg">
+      <div class="g"><div class="gtrack"><div class="gfill" id="g-down" style="background:var(--c-canary)"></div></div>
+        <div class="gv" id="v-down">—</div><div class="gl">DOWN MBPS</div></div>
+      <div class="g"><div class="gtrack"><div class="gfill" id="g-up" style="background:var(--c-peach)"></div></div>
+        <div class="gv" id="v-up">—</div><div class="gl">UP MBPS</div></div></div>
+    <canvas id="spark"></canvas>
+    <div class="clb" style="height:auto;text-align:center">WAN <span class="v" id="v-stat">—</span> · IP <span class="v" id="v-ip">—</span></div>`;
+  const ty = cy0 + 4.35 + (cy1 - cy0 - 4.35) * 0.62 + 0.5;
+  scr.shape(dx, ty, wR, 1.1, { capRight:true, color:'lilac' });
+  scr.text(dx + 0.5, ty, wR - 1, 1.1, 'TOP CONDUITS', { fs:'sub', color:'black', weight:600 });
+  scr.panel(dx, ty + 1.35, wR, cy1 - ty - 1.35).innerHTML =
+    `<div class="clb" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%">
+     <div class="standby">■ AWAITING NTOPNG UPLINK</div>
+     <div style="opacity:.55;margin-top:.5em;text-align:center">PER-HOST TALKERS ARRIVE WITH THE OPNSENSE CUTOVER</div></div>`;
+}
+
+/* ---- live loop: real sensors drive the grid ---- */
+const hist = [];
+function tick() {
+  const dn = HA.num('sensor.arris_tg4482a_download_speed', NaN);
+  const up = HA.num('sensor.arris_tg4482a_upload_speed', NaN);
+  const fin = HA.num('sensor.fred_net_in', 0), fout = HA.num('sensor.fred_net_out', 0);
+  const tvOn = HA.st('binary_sensor.living_room_tv_connectivity')?.state === 'on';
+  const sim = isNaN(dn);
+  const d = sim ? 40 + Math.random() * 400 : dn, u2 = sim ? 10 + Math.random() * 30 : up;
+  /* gauges (log scale vs 1000/50 Mbps ceilings) + history */
+  const pct = (v, max) => Math.min(100, Math.max(2, 100 * Math.log10(1 + v) / Math.log10(1 + max)));
+  const g1 = document.getElementById('g-down'); if (!g1) return;
+  g1.style.height = pct(d, 1000) + '%';
+  document.getElementById('g-up').style.height = pct(u2, 50) + '%';
+  document.getElementById('v-down').textContent = Math.round(d);
+  document.getElementById('v-up').textContent = Math.round(u2);
+  document.getElementById('v-stat').textContent =
+    (HA.st('binary_sensor.arris_tg4482a_wan_status')?.state === 'on' ? 'ONLINE' : (sim ? 'SIM' : 'CHECK'));
+  document.getElementById('v-ip').textContent = HA.st('sensor.arris_tg4482a_external_ip')?.state ?? '—';
+  hist.push(d); if (hist.length > 90) hist.shift();
+  /* sparkline */
+  const cv = document.getElementById('spark'), ctx = cv.getContext('2d');
+  cv.width = cv.clientWidth; cv.height = cv.clientHeight;
+  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--c-canary').trim() || '#fc3';
+  ctx.lineWidth = 1.5; ctx.beginPath();
+  const mx = Math.max(...hist, 1);
+  hist.forEach((v, i) => { const x = i / 89 * cv.width, y = cv.height - (v / mx) * (cv.height - 4) - 2;
+    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+  ctx.stroke();
+  /* conduit flow speeds: more Mbps = faster dashes (floor 0.4s, idle 8s) */
+  const durFor = v => Math.max(0.4, 8 / (1 + v / 20)).toFixed(2) + 's';
+  document.querySelectorAll('.flow[data-live="wan"]').forEach(p => p.style.setProperty('--dur', durFor(d + u2)));
+  document.querySelectorAll('.flow[data-live="fred"],.flow[data-live="fred2"]').forEach(p => p.style.setProperty('--dur', durFor(fin + fout)));
+  document.querySelectorAll('.flow[data-live="tv"]').forEach(p => { p.style.opacity = tvOn ? 1 : 0.15; });
+  /* node value lines */
+  const vals = { wan: Math.round(d) + '↓ ' + Math.round(u2) + '↑ MBPS', fred: Math.round(fin + fout) + ' MB/S',
+    tv: tvOn ? 'ONLINE' : 'STANDBY', cams: '3 FEEDS LIVE', haos: 'JARVIS ONLINE' };
+  for (const [id, txt] of Object.entries(vals)) {
+    const el = document.querySelector(`[data-val="${id}"]`); if (el) el.textContent = txt;
+  }
+}
+HA.init({ core:{}, climate:{}, media:[], dimmers:[[,'',0],[,'',0],[,'',0],[,'',0]] }, () => {}, () => {});
+render();
+setInterval(tick, 2000); setTimeout(tick, 1200);
+addEventListener('resize', render);
+</script>
+</body>
+</html>
