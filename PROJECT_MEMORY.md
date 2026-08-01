@@ -293,6 +293,26 @@ dhcpcd run had written the empty file and nothing maintained it (dhcpcd itself i
 Fix: `nohook resolv.conf` appended to /etc/dhcpcd.conf + resolv.conf written with 1.1.1.1/8.8.8.8.
 Applied via `qm guest exec 101` from the PVE host. No service interruption.
 
+**⚠️ THE CADDY CONTAINER IS SHARED INFRASTRUCTURE — IT IS NOT JUST LaFORGE'S**
+A parallel Cowork session ("Jarvis") was independently about to deploy its own Caddy for
+Vaultwarden and collided with this one — ports 80/443 can only have one owner. It stopped,
+reported back, and the reconciliation was to add its site to THIS Caddy. As of 2026-08-01
+the `laforge` container serves THREE sites:
+  - `lcc.necrotic.us`   → static LaForge bundle from /srv
+  - `ha.necrotic.us`    → reverse_proxy 10.0.0.149:8123 (X-Forwarded-* STRIPPED)
+  - `vault.necrotic.us` → reverse_proxy 10.0.0.75:8080 (X-Forwarded-* KEPT — Vaultwarden
+    needs the real client IP for login rate-limiting and the admin audit log)
+**DANGER: the redeploy procedure above PUTs a whole Caddyfile tar. If you regenerate that
+file from project docs instead of reading the live one, you will silently delete the other
+sites.** Always start from the container's own copy:
+`docker exec laforge cat /etc/caddy/Caddyfile`, edit, then
+`caddy validate` → `caddy reload` (zero downtime — never restart the container).
+Adding a site is: append the block (reuse `import cloudflare_tls`), reload, then add the
+matching OPNSense Unbound override → 10.0.0.75.
+**Lesson for future sessions:** two agents with the same credentials on one host cannot see
+each other and there is no locking. Check `docker ps` and what is already bound BEFORE
+claiming a port.
+
 **UI WIRED THIS SESSION**
 - **MEDIA·VOLUME is live + draggable** — new `buildHSliders()` helper in app.js (horizontal
   sibling of buildDimmers). SPEAKERS column = 5 media_players; AUX column = 3 Ring camera
