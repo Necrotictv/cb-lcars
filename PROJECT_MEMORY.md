@@ -247,6 +247,89 @@ adding real devices (TP-Link/Tuya) + the floor plan himself later tonight.
 - To remove: delete `automation.lcars_red_alert_on_siren` (Settings → Automations) and the alert-row from the
   DIRECT CONTROL section.
 
+### 2026-07-31 — 🚀 DEPLOYED TO FRED · https://lcc.necrotic.us · MEDIA + CLIMATE wired
+**LaForge is live on the network.** Serving stack, TLS, internal DNS, and the last
+pre-deploy UI items all landed. Previous HEAD `e9b44f4`; this work is uncommitted at
+time of writing (Claude cannot run git — vault-write rule; Patrick commits from PowerShell).
+
+**SERVING STACK (Fred docker-host 10.0.0.75, container `laforge`, visible in Portainer)**
+- Image `ghcr.io/caddybuilds/caddy-cloudflare:latest` (Caddy + Cloudflare DNS module).
+- Volumes: `laforge_site:/srv` (the bundle), `laforge_caddy_conf:/etc/caddy` (Caddyfile),
+  `laforge_caddy_data:/data` (certs — DO NOT delete, holds the ACME account + certs),
+  `laforge_caddy_config:/config`. Ports 80/443 tcp + 443 udp (HTTP/3). Restart unless-stopped.
+- **Deploy = PUT a tar to the Docker archive API** (`/containers/laforge/archive?path=/`)
+  through the Portainer API proxy. Files land in the volume and survive container recreate.
+  Bump `?v=` in main.html EVERY deploy (kiosk stale-cache gotcha). Currently ha.js?v=22, app.js?v=21.
+- **Real Let's Encrypt cert via DNS-01/Cloudflare** — verified `issuer=Let's Encrypt CN=YE1`,
+  expires 2026-10-30, auto-renews. WHY DNS-01: the host resolves only internally, so HTTP-01
+  is impossible; DNS-01 proves domain control with a TXT record and needs NO port forwarding.
+  Caddyfile pins `resolvers 1.1.1.1 8.8.8.8` so the challenge check doesn't hit internal DNS.
+
+**⚠️ THE MIXED-CONTENT TRAP (the non-obvious blocker)**
+An https page may NOT open a `ws://` socket. Serving LaForge over TLS therefore BREAKS the
+HA websocket unless HA is also on TLS. Solution: Caddy also fronts HA at `ha.necrotic.us`,
+and the DEPLOYED `config.local.js` uses `haUrl: 'https://ha.necrotic.us'` (the vault copy
+still points at http://10.0.0.149:8123 for local dev — they are intentionally different).
+- **HA returns 400 Bad Request behind a proxy** that sends X-Forwarded-* it doesn't trust.
+  Fixed in Caddy with `header_up -X-Forwarded-For/-Proto/-Host` — chosen over setting
+  `use_x_forwarded_for` + `trusted_proxies` in HA because that needs an HA restart.
+  Trade-off: HA logs the container IP as the client. Switch to the HA-side fix if real
+  client IPs ever matter. VERIFIED: `wss://ha.necrotic.us/api/websocket` → 101 → auth_ok, 325 entities.
+
+**INTERNAL DNS — OPNSense Unbound host overrides (OPNSense IS live at 192.168.1.1)**
+- `lcc.necrotic.us` → 10.0.0.75 and `ha.necrotic.us` → 10.0.0.75, added via the OPNSense API
+  (`/api/unbound/settings/addHostOverride` + `/api/unbound/service/reconfigure`).
+- Deliberately NOT public: `dig @1.1.1.1` returns nothing for both. No private IP leaked.
+- Network reality (corrects older notes): 192.168.1.0/24 = LAN behind OPNSense;
+  10.0.0.0/24 = DMZ behind Xfinity. Fred = 10.0.0.198 (PVE) + 192.168.1.198 (vmbr1).
+- **Tailscale**: Fred already advertises BOTH 10.0.0.0/24 and 192.168.1.0/24. For remote
+  access the only missing piece is Split DNS in the Tailscale admin console:
+  add nameserver `192.168.1.1` restricted to domain `necrotic.us`.
+
+**🐛 INFRA FIX — Docker VM had NO DNS AT ALL.** `/etc/resolv.conf` on 10.0.0.75 contained only
+dhcpcd comments, zero nameservers, so `docker pull` failed with `lookup ghcr.io on [::1]:53`.
+Cause: ens18 is static (ifupdown, with `dns-nameservers 1.1.1.1 8.8.8.8` declared) but an old
+dhcpcd run had written the empty file and nothing maintained it (dhcpcd itself is inactive).
+Fix: `nohook resolv.conf` appended to /etc/dhcpcd.conf + resolv.conf written with 1.1.1.1/8.8.8.8.
+Applied via `qm guest exec 101` from the PVE host. No service interruption.
+
+**UI WIRED THIS SESSION**
+- **MEDIA·VOLUME is live + draggable** — new `buildHSliders()` helper in app.js (horizontal
+  sibling of buildDimmers). SPEAKERS column = 5 media_players; AUX column = 3 Ring camera
+  speakers (`number.set_value`, 0–11) + `input_number.lcards_sound_volume`.
+  Drag THROTTLED to one service call / 250ms with an authoritative send on pointerup —
+  pointermove fires ~120×/s and the Echos are cloud-backed. `dragging` guard stops HA
+  state echoes from yanking the bar out from under a finger.
+- **🐛 REAL BUG FIXED:** the DOWNSTAIRS row was reading `number.downstairs_volume` — that is
+  the Ring **camera's** speaker, NOT the Echo (`media_player.downstairs`). Same room name,
+  different hardware. It had been showing camera volume under a speaker label since 7/11.
+- **TWO FLAGS on every row: `live` (entity exists → drives ·SIM tag) and `ctl` (can accept a
+  change right now).** The 85" TV is live-but-not-ctl when powered off — it carries no
+  `volume_level`, so a draggable bar would silently swallow every touch. Renders dimmed
+  read-only instead. GOTCHA: hand-built rows must set BOTH flags — `uiVolume` shipped with
+  only `live` and rendered dead until caught in browser test.
+- **MEDIA·PLAYERS** gained a TRANSPORT column (pause/resume/mute/unmute all awake players).
+  PLAYERS stays read-only ON PURPOSE; VOLUME is the control view.
+- **CLIMATE IS LIVE — `climate.living_room_sensi` existed all along.** ATMOSPHERE had been
+  showing "AWAITING CLIMATE ENTITIES" at a working thermostat. Now: big current temp, RH,
+  mode/action/fan, and ± setpoint steppers clamped to the entity's own min/max (45–95).
+  Optimistic UI on the setpoint (Sensi is cloud-backed and slow; a dead-looking button gets
+  mashed). NOTE Sensi lists 'heat' TWICE in hvac_modes — dedupe or you draw two buttons.
+- **CORE·NETWORK live** off the Arris sensors. External IP is MASKED (76.123.—.—) because
+  this screen gets filmed. Throughput sensors still read a flat 0.0 KiB/s → rendered
+  **NO DATA** rather than a confident zero. Added a TERMINAL row showing LCC.NECROTIC.US.
+
+**ENTITY SWEEP (325 entities, 2026-07-31) — what is still SIM and why**
+- Blocked on Patrick: dimmers LIVING/FOYER/KITCHEN (still only `light.backyard_light`),
+  SHUTTERS (**zero** `cover.*`), SCENES (**zero** `scene.*`), holodeck hooks (zero `script.*`).
+- Newly noticed: `media_player.vlc_telnet` is LIVE — the old VLC-on-Fred task is already done.
+- Still true: fridge water filter 100% · REPLACE.
+
+**VERIFIED IN BROWSER** at https://lcc.necrotic.us — ONLINE, cameras streaming, MEDIA/VOLUME
+and ATMOSPHERE both correct. Service path proven with a deliberate NO-OP call (wrote the
+bedroom Echo's current value back: ACCEPTED, nothing changed). **First real drag left to
+Patrick**, same convention as the flood light.
+
 ### 2026-07-14 — SHAKEDOWN PASS (full-site QA sweep) — 1 critical bug, 2 upgrades, all screens clean
 - **Instrumented QA walk built + run:** JS harness drives every screen + local view via the real
   pointerup path (nav pills only — never device controls), scanning each state for JS errors,

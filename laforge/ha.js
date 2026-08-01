@@ -135,14 +135,101 @@ const HA = (() => {
       ['DOWNSTAIRS', 'camera.downstairs_live_view', localHM('sensor.downstairs_last_activity')],
     ];
 
+    /* ---- MEDIA rows ----
+       Each row is now a SELF-DESCRIBING object: it knows its entity, the domain
+       service that moves it, and its native scale. WHY: the VOLUME view drives
+       three different kinds of device (Echo, SmartThings TV, Ring camera
+       speaker) and one code path should handle all of them — the row carries
+       the knowledge, the slider stays dumb.
+
+       ⚠️ BUG FIX 2026-07-31: the DOWNSTAIRS row used to read
+       `number.downstairs_volume`. That is NOT the Echo — it is the Ring
+       *camera's* speaker volume (0–11), a different physical device that merely
+       shares a room name. The row displayed camera volume while labelled as the
+       speaker. Echos now read their own volume_level, like every other player.
+
+       Scale note: media_player.volume_set takes 0..1; number.set_value takes the
+       entity's own range. `pct` is always 0..100 for the UI; toNative converts.
+
+       TWO FLAGS, NOT ONE (learned the hard way on the 85" TV):
+         live — the entity EXISTS in HA. Drives the ·SIM honesty tag.
+         ctl  — the entity can accept a volume change RIGHT NOW.
+       A powered-off TV is live but not ctl: it reports state 'off' and carries
+       no volume_level at all, so a draggable bar there would be a lie that
+       silently swallows every touch. Read-only until it wakes up. */
+    const player = (label, id) => {
+      const s = st(id), vl = s?.attributes?.volume_level;
+      return { label, id, domain:'media_player', service:'volume_set', field:'volume_level',
+        state: (s?.state ?? 'unavailable').toUpperCase(),
+        live: !!s,
+        ctl:  vl !== undefined,                       // no volume_level = nothing to set
+        pct:  Math.round((vl ?? 0) * 100),
+        toNative: p => p / 100 };
+    };
+    const numVol = (label, id) => {
+      const s = st(id), max = s?.attributes?.max ?? 11;
+      return { label, id, domain:'number', service:'set_value', field:'value',
+        state: s ? 'READY' : 'OFFLINE', live: !!s, ctl: !!s,
+        pct: Math.round(num(id, 0) / max * 100),
+        toNative: p => Math.round(p / 100 * max) };
+    };
     D.media = [
-      ['MAIN VIEWSCREEN · 85"', st('media_player.living_room_85_crystal_uhd')?.state ?? 'unknown',
-        Math.round((st('media_player.living_room_85_crystal_uhd')?.attributes?.volume_level ?? 0) * 10)],
-      ['DOWNSTAIRS',  st('media_player.downstairs')?.state ?? 'unknown',        num('number.downstairs_volume', 6)],
-      ['EVERYWHERE',  st('media_player.everywhere')?.state ?? 'unknown',        5],
-      ['BEDROOM · P', st('media_player.patrick_s_bedroom')?.state ?? 'unknown', 4],
-      ['IZZY’S ROOM', st('media_player.izzy_s_room')?.state ?? 'unknown',       3],
+      player('MAIN VIEWSCREEN · 85″', 'media_player.living_room_85_crystal_uhd'),
+      player('DOWNSTAIRS',            'media_player.downstairs'),
+      player('EVERYWHERE',            'media_player.everywhere'),
+      player('BEDROOM · P',           'media_player.patrick_s_bedroom'),
+      player('IZZY’S ROOM',           'media_player.izzy_s_room'),
     ];
+    /* Ring camera speakers — same room names, different hardware. Kept in a
+       separate list so nobody confuses them with the Echos ever again. */
+    D.camAudio = [
+      numVol('CAM · FRONT DOOR', 'number.front_door_volume'),
+      numVol('CAM · BACKYARD',   'number.backyard_volume'),
+      numVol('CAM · DOWNSTAIRS', 'number.downstairs_volume'),
+    ];
+    /* LCARdS beep volume (0..1) — the terminal's own UI sound level, kept in HA
+       so an automation or another dashboard can duck it. */
+    D.uiVolume = {
+      label:'LCARS INTERFACE', id:'input_number.lcards_sound_volume',
+      domain:'input_number', service:'set_value', field:'value',
+      state:'ACTIVE',
+      live: !!st('input_number.lcards_sound_volume'),
+      ctl:  !!st('input_number.lcards_sound_volume'),   // hand-built row: set BOTH flags
+      pct: Math.round(num('input_number.lcards_sound_volume', 0.8) * 100),
+      toNative: p => Math.round(p) / 100 };
+
+    /* ---- HVAC: climate.living_room_sensi ----
+       Appeared in HA sometime before 2026-07-31 (found during the pre-deploy
+       entity sweep) — ATMOSPHERE had been showing "AWAITING CLIMATE ENTITIES"
+       against a thermostat that was already live. supported_features 395 =
+       target temp + target range + fan mode + turn on/off.
+       Sensi reports 'heat' TWICE in hvac_modes; dedupe or the UI draws two
+       identical buttons. */
+    const hv = st('climate.living_room_sensi');
+    D.hvac = hv ? {
+      id: 'climate.living_room_sensi',
+      mode:    hv.state,                                        // off/heat/cool/heat_cool
+      action:  hv.attributes.hvac_action ?? 'idle',             // idle/cooling/heating
+      cur:     Math.round(hv.attributes.current_temperature ?? 0),
+      target:  Math.round(hv.attributes.temperature ?? 0),
+      hum:     hv.attributes.current_humidity ?? null,
+      fan:     hv.attributes.fan_mode ?? '—',
+      fanModes:hv.attributes.fan_modes ?? [],
+      modes:   [...new Set(hv.attributes.hvac_modes ?? [])],
+      min:     hv.attributes.min_temp ?? 45,
+      max:     hv.attributes.max_temp ?? 95,
+    } : null;
+
+    /* ---- WAN status (Arris gateway) ----
+       ⚠️ Both speed sensors have reported 0.0 KiB/s since at least 7/14. Rather
+       than draw a confident 0, the UI shows NO DATA — an honest readout beats a
+       plausible-looking lie on a wall panel. */
+    D.net = {
+      up:   st('binary_sensor.arris_tg4482a_wan_status')?.state === 'on',
+      ip:   st('sensor.arris_tg4482a_external_ip')?.state ?? '—',
+      down: num('sensor.arris_tg4482a_download_speed', 0),
+      upl:  num('sensor.arris_tg4482a_upload_speed', 0),
+    };
 
     /* SmartThings appliances (probed 2026-07-11): TV live, fridge extras live,
        Bespoke washer/dryer NOT in HA yet → UI shows AWAITING UPLINK placeholder */

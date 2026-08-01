@@ -47,7 +47,16 @@ const DATA = {
   climate: { temp:71, condition:'CLEAR', humidity:44, wind:4, sunset:'20:31', sunrise:'05:48' },
   alert:   'green_alert',
   floodOn: false,
-  media:   [ ['DOWNSTAIRS','idle',6], ['EVERYWHERE','standby',5], ['BEDROOM · P','standby',4], ['IZZY’S ROOM','standby',3] ],
+  /* media rows are objects now (ha.js builds the live ones) — see ha.js sync().
+     `live:false` means mock, and the UI tags it ·SIM like everything else. */
+  media:   [ { label:'DOWNSTAIRS',  state:'IDLE',    pct:50, live:false },
+             { label:'EVERYWHERE',  state:'STANDBY', pct:45, live:false },
+             { label:'BEDROOM · P', state:'STANDBY', pct:43, live:false },
+             { label:'IZZY’S ROOM', state:'STANDBY', pct:40, live:false } ],
+  camAudio: [],
+  uiVolume: null,
+  hvac:    null,
+  net:     { up:true, ip:'—', down:0, upl:0 },
 };
 const alertLabel = () => (DATA.alert || 'green').split('_')[0].toUpperCase();
 
@@ -235,8 +244,8 @@ function clusterBody(id) {
         `<div class="cam" data-n="${n}"><img class="camimg" id="camthumb-${i}" alt=""><i class="scan"></i></div>`).join('') + `</div>
       MOTION <span class="v">ARMED</span> · SIRENS <span class="v">STANDBY</span>`;
     case 'science': return `CONDITION <span class="v">${DATA.climate.condition}</span><br>HUMIDITY <span class="v">${DATA.climate.humidity}%</span><br>SUNSET <span class="v">${DATA.climate.sunset}</span> · LUNA <span class="v">${moonPhase().illum}%</span>`;
-    case 'media': return DATA.media.slice(0, 3).map(([n, s, v]) =>
-      `${n} <span class="v">${s === 'playing' ? 'VOL ' + v : s.toUpperCase()}</span>`).join('<br>');
+    case 'media': return DATA.media.slice(0, 3).map(r =>
+      `${r.label} <span class="v">${r.state === 'PLAYING' ? 'VOL ' + r.pct : r.state}</span>`).join('<br>');
     case 'home': return `14:00 <span class="v">STANDUP</span><br>18:30 <span class="v">FILM SESSION</span><br>LITTER ROBOT <span class="v">CYCLED 12:40</span>`;
     case 'core': { const cpu = Math.round(DATA.core.cpu), mem = Math.round(DATA.core.mem);
       const memShow = DATA.core.memLabel ?? mem;
@@ -463,6 +472,78 @@ function buildDimmers(panel, idxs) {
     track.addEventListener('pointerdown', e => { track.setPointerCapture(e.pointerId); set(e);
       track.onpointermove = set; });
     track.addEventListener('pointerup', () => track.onpointermove = null);
+  });
+}
+
+/* ---- buildHSliders: horizontal draggable bars bound to real HA entities ----
+   The MEDIA/audio counterpart to buildDimmers. Each row is one of the
+   self-describing objects ha.js builds (see D.media / D.camAudio / D.uiVolume):
+   it knows its entity, its service, and how to convert 0–100 to that entity's
+   native scale.
+
+   Two things matter here and both are about not abusing HA:
+
+   1. THROTTLE THE DRAG. A pointermove fires ~120×/sec. Firing volume_set that
+      often floods the websocket and, on cloud-backed devices like the Echos,
+      gets you rate-limited or laggy. So: repaint the bar instantly on every
+      move (the UI must feel direct), but only SEND at most every 250ms, and
+      always send a final authoritative value on pointerup.
+   2. DON'T FIGHT THE USER. state_changed echoes back from HA while a finger is
+      still down; `dragging` guards the row so an in-flight echo can't yank the
+      bar out from under the thumb.
+
+    Row flags (set in ha.js): `live` = entity exists (no ·SIM tag), `ctl` = it can
+   take a change right now. A powered-off TV is live but not ctl — it renders
+   dimmed and read-only instead of pretending to accept drags. */
+function buildHSliders(panel, rows, color = 'magenta') {
+  panel.innerHTML = `<div class="clb">` + rows.map((r, i) => `
+    <div class="mb hsl" data-i="${i}" style="${r.ctl ? '' : 'opacity:.55'}">
+      <div class="k" style="width:calc(var(--u)*6)">${r.label}${
+        r.live ? '' : ' <span class="w" style="opacity:.6">·SIM</span>'}</div>
+      <div class="t"><i style="width:${r.pct}%;background:var(--c-${color})"></i></div>
+      <div class="n">${r.pct}</div>
+      <div style="width:calc(var(--u)*4);text-align:right;color:var(--c-orange)">${r.state ?? ''}</div>
+    </div>`).join('') + `</div>`;
+
+  panel.querySelectorAll('.hsl').forEach(el => {
+    const row = rows[+el.dataset.i];
+    if (!row.ctl || !row.id) return;                   // mock + asleep rows: read-only
+    const track = el.querySelector('.t');
+    const fill  = el.querySelector('.t i');
+    const label = el.querySelector('.n');
+    let dragging = false, lastSent = 0, pendingPct = null;
+
+    /* send at most every 250ms while dragging; force:true bypasses on release */
+    const push = (pct, force) => {
+      const now = performance.now();
+      if (!force && now - lastSent < 250) { pendingPct = pct; return; }
+      lastSent = now; pendingPct = null;
+      HA.call(row.domain, row.service,
+        { entity_id: row.id, [row.field]: row.toNative(pct) });
+    };
+
+    const paint = e => {
+      const r = track.getBoundingClientRect();
+      const pct = Math.round(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * 100);
+      row.pct = pct;
+      fill.style.width = pct + '%';
+      label.textContent = pct;
+      return pct;
+    };
+
+    track.style.cursor = 'pointer';
+    track.addEventListener('pointerdown', e => {
+      dragging = true; track.setPointerCapture(e.pointerId);
+      push(paint(e), true);
+      track.onpointermove = ev => { if (dragging) push(paint(ev), false); };
+    });
+    const release = e => {
+      if (!dragging) return;
+      dragging = false; track.onpointermove = null;
+      push(pendingPct ?? row.pct, true);               // authoritative final value
+    };
+    track.addEventListener('pointerup', release);
+    track.addEventListener('pointercancel', release);
   });
 }
 
@@ -716,10 +797,43 @@ function renderWorkspace(scr, g, view, x0, y0, x1, y1) {
       break; }
     case 'environ:ATMOSPHERE': {
       const [cc, cs, ap] = cols([['canary','CLIMATE CONTROL'], ['peri','COLD STORAGE'], ['gold','APPLIANCES']]);
-      /* AC/thermostat: standby until climate entities exist in HA */
-      cc.innerHTML = `<div class="clb" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%">
-        <div class="standby">■ STANDBY</div>
-        <div style="opacity:.6;margin-top:.6em">AWAITING CLIMATE ENTITIES · AC / THERMOSTAT</div></div>`;
+      /* ---- LIFE SUPPORT: climate.living_room_sensi (wired 2026-07-31) ----
+         The Sensi thermostat had been in HA for a while; this panel was still
+         showing STANDBY. Now: live temp/humidity/action + real setpoint control.
+         Setpoint uses optimistic UI — paint the new number immediately, then
+         call climate.set_temperature. WHY: thermostats round-trip slowly
+         (Sensi is cloud-backed) and a button that looks dead for two seconds
+         gets pressed five more times. */
+      const H = DATA.hvac;
+      if (!H) {
+        cc.innerHTML = `<div class="clb" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%">
+          <div class="standby">■ STANDBY</div>
+          <div style="opacity:.6;margin-top:.6em">THERMOSTAT OFFLINE · NO CLIMATE ENTITY</div></div>`;
+        scr.breathe(cc.querySelector('.standby'), { soft:true });
+      } else {
+        const ACT = { cooling:'COOLING', heating:'HEATING', idle:'IDLE', off:'OFF', fan:'FAN' };
+        cc.innerHTML = `<div class="clb">
+          <div style="display:flex;align-items:baseline;gap:.5em">
+            <span style="font-size:calc(var(--u)*2.2);color:var(--c-canary);line-height:1">${H.cur}°</span>
+            <span style="opacity:.7">CABIN · ${H.hum != null ? H.hum + '% RH' : '—'}</span>
+          </div>
+          MODE <span class="v">${H.mode.toUpperCase().replace('_',' ')}</span> ·
+          STATUS <span class="v">${ACT[H.action] ?? H.action.toUpperCase()}</span><br>
+          FAN <span class="v">${H.fan.toUpperCase()}</span>
+          <div class="mb" style="margin-top:.5em">
+            <div class="k" style="width:calc(var(--u)*6)">SETPOINT</div>
+            <div class="wbtn tstep" data-d="-1" style="background:var(--c-peri);width:calc(var(--u)*2);text-align:center">−</div>
+            <div class="n" id="tset" style="width:calc(var(--u)*3);font-size:calc(var(--u)*1.1);color:var(--c-canary)">${H.target}°</div>
+            <div class="wbtn tstep" data-d="1" style="background:var(--c-canary);width:calc(var(--u)*2);text-align:center">+</div>
+          </div></div>`;
+        /* setpoint steppers — clamp to the thermostat's own min/max, never guess */
+        let target = H.target;
+        cc.querySelectorAll('.tstep').forEach(b => scr.onTap(b, () => {
+          target = Math.max(H.min, Math.min(H.max, target + (+b.dataset.d)));
+          cc.querySelector('#tset').textContent = target + '°';
+          HA.call('climate', 'set_temperature', { entity_id: H.id, temperature: target });
+        }));
+      }
       /* cold storage = life support flavor on REAL refrigerator sensors */
       const rf = id => Math.round(HA.num('sensor.refrigerator_' + id, 0) * 10) / 10;
       const A = DATA.appliances ?? {};
@@ -927,11 +1041,28 @@ function renderWorkspace(scr, g, view, x0, y0, x1, y1) {
 
     /* ---------------- MEDIA ---------------- */
     case 'media:PLAYERS': {
-      const [pl] = cols([['magenta','AUDIO PLAYERS']]);
-      pl.innerHTML = `<div class="clb">` + DATA.media
-        .map(([n, s, v]) => `<div class="mb"><div class="k" style="width:calc(var(--u)*6)">${n}</div>
-          <div class="t"><i style="width:${v * 9}%"></i></div><div class="n">${v}</div>
-          <div style="width:calc(var(--u)*4);text-align:right;color:var(--c-orange)">${s.toUpperCase()}</div></div>`).join('') + `</div>`;
+      /* PLAYERS is the STATUS view — transport + state, read-only on purpose.
+         VOLUME is the control view. Keeping them separate means a stray tap
+         while glancing at what's playing can't change a volume. */
+      const [pl, tr] = cols([['magenta','AUDIO PLAYERS'], ['peri','TRANSPORT']]);
+      pl.innerHTML = `<div class="clb">` + DATA.media.map(r =>
+        `<div class="mb"><div class="k" style="width:calc(var(--u)*6)">${r.label}${
+          r.live ? '' : ' <span class="w" style="opacity:.6">·SIM</span>'}</div>
+          <div class="t"><i style="width:${r.pct}%;background:var(--c-magenta)"></i></div>
+          <div class="n">${r.pct}</div>
+          <div style="width:calc(var(--u)*4);text-align:right;color:var(--c-orange)">${r.state}</div></div>`
+        ).join('') + `</div>`;
+      /* transport acts on whichever players are actually awake */
+      const awake = DATA.media.filter(r => r.live && r.state !== 'OFF' && r.state !== 'UNAVAILABLE');
+      const all = { entity_id: awake.map(r => r.id) };
+      btns(scr, tr, [
+        ['peri',    'PAUSE ALL',   () => awake.length && HA.call('media_player', 'media_pause', all)],
+        ['peri',    'RESUME ALL',  () => awake.length && HA.call('media_player', 'media_play', all)],
+        ['salmon',  'SILENCE ALL', () => awake.length && HA.call('media_player', 'volume_mute',
+                                          { ...all, is_volume_muted: true })],
+        ['magenta', 'UNMUTE ALL',  () => awake.length && HA.call('media_player', 'volume_mute',
+                                          { ...all, is_volume_muted: false })],
+      ]);
       break; }
     case 'media:ANNOUNCE': {
       const [an, st] = cols([['magenta','SHIP-WIDE ANNOUNCE'], ['lilac','VOICE']]);
@@ -940,10 +1071,14 @@ function renderWorkspace(scr, g, view, x0, y0, x1, y1) {
         MIC <span class="v">${LCARS.settings.get('micMute', false) ? 'MUTED' : 'LIVE'}</span></div>`;
       break; }
     case 'media:VOLUME': {
-      const [vol] = cols([['magenta','VOLUME · ALL DEVICES']]);
-      vol.innerHTML = `<div class="clb">` + [['MASTER AUDIO',50], ['DOWNSTAIRS',55], ['EVERYWHERE',45], ['BEDROOM · P',36], ['IZZY’S ROOM',27]]
-        .map(([n, v]) => `<div class="mb"><div class="k" style="width:calc(var(--u)*6)">${n}</div>
-          <div class="t"><i style="width:${v}%;background:var(--c-magenta)"></i></div><div class="n">${v}</div></div>`).join('') + `</div>`;
+      /* LIVE + DRAGGABLE as of 2026-07-31. Three device families, one slider
+         helper — each row carries its own service and scale (see ha.js). */
+      const [vol, aux] = cols([['magenta','VOLUME · SPEAKERS'], ['peri','AUX AUDIO']]);
+      buildHSliders(vol, DATA.media, 'magenta');
+      /* camera speakers + the terminal's own beep level share the aux column */
+      const auxRows = [...(DATA.camAudio ?? []), ...(DATA.uiVolume ? [DATA.uiVolume] : [])];
+      if (auxRows.length) buildHSliders(aux, auxRows, 'peri');
+      else aux.innerHTML = `<div class="clb"><span class="w">NO AUX CHANNELS</span></div>`;
       break; }
 
     /* ---------------- HOME ---------------- */
@@ -1010,10 +1145,24 @@ function renderWorkspace(scr, g, view, x0, y0, x1, y1) {
       break; }
     case 'core:NETWORK': {
       const [wan, lan] = cols([['peach','WAN · SUBSPACE LINK'], ['peri','LAN']]);
-      wan.innerHTML = `<div class="clb">STATUS <span class="v">ONLINE</span><br>IP <span class="v">73.—.—.—</span><br>
-        DOWN <span class="v">842 MBPS</span> · UP <span class="v">38 MBPS</span></div>`;
+      /* LIVE off the Arris integration (wired 2026-07-31). The throughput
+         sensors have read a flat 0.0 KiB/s since at least 7/14, so 0 is
+         rendered as NO DATA rather than a confident zero — a wall panel that
+         lies quietly is worse than one that admits a dead sensor.
+         External IP is masked: this screen gets filmed. */
+      const N = DATA.net ?? {};
+      const rate = v => v > 0
+        ? `<span class="v">${v > 1024 ? (v / 1024).toFixed(1) + ' MB/S' : Math.round(v) + ' KB/S'}</span>`
+        : `<span class="w">NO DATA</span>`;
+      const maskIp = ip => (ip && ip.includes('.'))
+        ? ip.split('.').map((o, i) => i < 2 ? o : '—').join('.') : '—';
+      wan.innerHTML = `<div class="clb">
+        STATUS ${N.up ? '<span class="v">ONLINE</span>' : '<span class="w">LINK DOWN</span>'}<br>
+        IP <span class="v">${maskIp(N.ip)}</span><br>
+        DOWN ${rate(N.down)} · UP ${rate(N.upl)}</div>`;
       lan.innerHTML = `<div class="clb">GATEWAY <span class="v">XFINITY (OPNSENSE PENDING)</span><br>
         HAOS <span class="v">10.0.0.149</span> · PORTAINER <span class="v">10.0.0.77</span><br>
+        TERMINAL <span class="v">LCC.NECROTIC.US</span><br>
         NTOPNG <span class="w">PHASE 2</span></div>`;
       break; }
     case 'core:UPDATES': {
