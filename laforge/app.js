@@ -242,7 +242,15 @@ function clusterBody(id) {
     case 'security': return `
       <div class="cams">` + DATA.cams.map(([n], i) =>
         `<div class="cam" data-n="${n}"><img class="camimg" id="camthumb-${i}" alt=""><i class="scan"></i></div>`).join('') + `</div>
-      MOTION <span class="v">ARMED</span> · SIRENS <span class="v">STANDBY</span>`;
+      ${(() => {                       // LIVE as of 2026-08-01 — was hardcoded
+        const S = DATA.security;
+        if (!S || !S.motionAll) return `MOTION <span class="w">UNKNOWN</span>`;
+        const m = S.motionOn === S.motionAll ? `<span class="v">ARMED</span>`
+                : S.motionOn === 0          ? `<span class="w">DISARMED</span>`
+                : `<span class="w">PARTIAL ${S.motionOn}/${S.motionAll}</span>`;
+        const s = S.sirenOn ? `<span class="w">SOUNDING</span>` : `<span class="v">STANDBY</span>`;
+        return `MOTION ${m} · SIRENS ${s}`;
+      })()}`;
     case 'science': return `CONDITION <span class="v">${DATA.climate.condition}</span><br>HUMIDITY <span class="v">${DATA.climate.humidity}%</span><br>SUNSET <span class="v">${DATA.climate.sunset}</span> · LUNA <span class="v">${moonPhase().illum}%</span>`;
     case 'media': return DATA.media.slice(0, 3).map(r =>
       `${r.label} <span class="v">${r.state === 'PLAYING' ? 'VOL ' + r.pct : r.state}</span>`).join('<br>');
@@ -570,6 +578,23 @@ function scanWindow(scr, x, y, w, h, { title, code = '', color = 'lilac' } = {})
   return scr.panel(x + BR + 0.25, by, w - 2 * BR - 0.5, bh);
 }
 
+/* flashLine: transient confirmation inside a panel.
+   WHY: fire-and-forget service calls (announce, TTS, scene apply) produce no
+   visible state change — without feedback the panel looks broken and gets
+   tapped again, sending the announcement twice. Self-removes after 2.4s and
+   replaces any prior line so rapid taps can't stack. */
+function flashLine(panel, text, color = 'gold') {
+  panel.querySelector('.flashline')?.remove();
+  const d = document.createElement('div');
+  d.className = 'flashline';
+  d.textContent = '▸ ' + text;
+  d.style.cssText = `margin-top:.5em;color:var(--c-${color});letter-spacing:.08em`;
+  panel.appendChild(d);
+  d.animate([{opacity:0},{opacity:1}], {duration:140});
+  setTimeout(() => { d.animate([{opacity:1},{opacity:0}], {duration:300})
+    .onfinish = () => d.remove(); }, 2400);
+}
+
 const btns = (scr, panel, items) => {   // items: [color, text, action?] — action fires a real service call
   panel.innerHTML = `<div class="btncol">` + items.map(([c, t]) =>
     `<div class="wbtn" style="background:var(--c-${c})">${t}</div>`).join('') + `</div>`;
@@ -860,14 +885,37 @@ function renderWorkspace(scr, g, view, x0, y0, x1, y1) {
         ${washerHtml}</div>`;
       break; }
     case 'environ:SHUTTERS': {
-      workspaceStandby(scr, x0, y0, x1, y1, g, 'SHUTTER CONTROL · AWAITING COVER ENTITIES (BLINDS)');
+      /* Genuinely blocked — zero cover.* entities exist. Name the actual
+         dependency so a future session doesn't re-investigate from scratch. */
+      workspaceStandby(scr, x0, y0, x1, y1, g,
+        'SHUTTER CONTROL · NO COVER ENTITIES IN HA<br>' +
+        '<span style="opacity:.6">REQUIRES MOTORISED BLINDS PAIRED VIA TUYA / SMART LIFE</span>');
       break; }
     case 'environ:SCENES': {
-      const [sc, inf] = cols([['canary','SCENE SELECT'], ['lilac','SCENE DETAIL']]);
-      btns(scr, sc, [['lilac','EVENING'], ['magenta','MOVIE'], ['gold','GOODNIGHT'], ['peri','ALL OFF']]);
-      inf.innerHTML = `<div class="clb">EVENING <span class="v">LIVING 40 · FOYER 25</span><br>
-        MOVIE <span class="v">LIVING 12 · KITCHEN 0</span><br>GOODNIGHT <span class="v">ALL OFF · FLOOD AUTO</span><br>
-        <span class="w">SCENES BUILD IN PHASE 2 (HA)</span></div>`;
+      /* ---- REAL SCENES (2026-08-01) ----
+         Was "SCENES BUILD IN PHASE 2" over four dead buttons. HA owns only one
+         light so native scene.* is a non-starter — but Alexa already holds the
+         lighting scenes and exposes each as a button entity. Firing those is
+         real control, available now. Swap to native scenes later if the MOES
+         switches land in HA. */
+      const R = (DATA.routines?.lights ?? []);
+      const [sc, inf] = cols([['canary','LIGHTING SCENES'], ['lilac','DIRECT']]);
+      if (R.length) {
+        const palette = ['canary','gold','lilac','peri','magenta','salmon'];
+        btns(scr, sc, R.slice(0, 7).map((r, i) => [palette[i % palette.length], r.label,
+          () => { HA.call('button', 'press', { entity_id: r.id }); flashLine(sc, r.label + ' FIRED'); }]));
+      } else {
+        sc.innerHTML = `<div class="clb"><span class="w">NO LIGHTING ROUTINES FOUND</span></div>`;
+      }
+      /* the one light HA actually owns, plus an honest note about the rest */
+      btns(scr, inf, [
+        ['canary', 'BACKYARD FLOOD · ' + (DATA.floodOn ? 'ON' : 'OFF'),
+          () => HA.call('light', 'toggle', { entity_id:'light.backyard_light' })]]);
+      inf.innerHTML += `<div class="clb" style="margin-top:.6em;opacity:.7">
+        SCENES ABOVE EXECUTE VIA ALEXA ROUTINES.<br>
+        HA DIRECTLY OWNS <span class="v">1</span> LIGHT
+        (<span class="v">BACKYARD FLOOD</span>).<br>
+        <span class="w">NATIVE SCENES + DIMMING AWAIT MOES / TUYA SWITCHES IN HA.</span></div>`;
       break; }
 
     /* ---------------- SECURITY ---------------- */
@@ -1065,10 +1113,76 @@ function renderWorkspace(scr, g, view, x0, y0, x1, y1) {
       ]);
       break; }
     case 'media:ANNOUNCE': {
-      const [an, st] = cols([['magenta','SHIP-WIDE ANNOUNCE'], ['lilac','VOICE']]);
-      btns(scr, an, [['magenta','ALL DECKS'], ['magenta','DECK 01 · MAIN'], ['magenta','DECK 02 · UPPER']]);
-      st.innerHTML = `<div class="clb">VOICE <span class="v">MAJEL</span><br>TTS <span class="w">AWAITING VOICE LAB</span><br>
-        MIC <span class="v">${LCARS.settings.get('micMute', false) ? 'MUTED' : 'LIVE'}</span></div>`;
+      /* ---- SHIP-WIDE PA (built 2026-08-01) ----
+         This panel used to be three dead buttons and "AWAITING VOICE LAB". It
+         was never actually blocked: Alexa exposes notify.<device>_announce
+         (broadcast chime + message) and notify.<device>_speak (plain TTS on one
+         device), and HA has a cloud TTS engine. All of that works TODAY.
+
+         What IS still gated is the LOCAL Majel voice (XTTS/Piper), which needs
+         GPU passthrough on Fred. So this panel ships the working half and
+         reports the Majel half honestly rather than pretending or staying dead. */
+      const A = DATA.announce ?? {};
+      const [pa, vox] = cols([['magenta','SHIP-WIDE ANNOUNCE'], ['lilac','VOICE SYSTEMS']]);
+
+      /* the message the buttons will speak; the input keeps it in sync */
+      let msg = 'All hands, this is the bridge.';
+
+      const send = (label, fn) => { fn(); flashLine(pa, label); };
+      const rows = [];
+      if (A.all) rows.push(['magenta', 'ALL DECKS · BROADCAST',
+        () => send('BROADCAST SENT', () => HA.call('notify', A.all.split('.')[1], { message: msg }))]);
+      (A.rooms ?? []).slice(0, 4).forEach(([name, ent]) =>
+        rows.push(['peri', name, () => send(name + ' HAILED',
+          () => HA.call('notify', ent.split('.')[1], { message: msg }))]));
+      if (!rows.length) rows.push(['peri', 'NO ANNOUNCE TARGETS IN HA', () => {}]);
+      btns(scr, pa, rows);
+
+      /* Free-text message line — an LCARS input, not a browser prompt().
+         PREPENDED, not appended: btns() sets innerHTML so it must run first,
+         and the message logically comes before choosing who hears it. Appending
+         also overflowed the 320px content box and silently clipped the input. */
+      const inp = document.createElement('div');
+      inp.className = 'lsearch';
+      inp.style.marginBottom = scr.U(0.5) + 'px';
+      inp.innerHTML = `<input placeholder="MESSAGE TEXT" spellcheck="false" value="${msg}">
+                       <div class="go">SET</div>`;
+      pa.insertBefore(inp, pa.firstChild);
+      pa.style.overflowY = 'auto';        // target list grows with new Echos
+      const box = inp.querySelector('input');
+      const commit = () => { msg = box.value.trim() || msg; flashLine(pa, 'MESSAGE SET'); };
+      box.addEventListener('input', () => { msg = box.value.trim() || msg; });
+      scr.onTap(inp.querySelector('.go'), commit);
+      box.addEventListener('keydown', e => { if (e.key === 'Enter') commit(); });
+
+      /* VOICE SYSTEMS — what speaks, and what is still waiting on hardware */
+      const engine = A.ttsEngine ? A.ttsEngine.split('.')[1].replace(/_/g, ' ').toUpperCase() : null;
+      vox.innerHTML = `<div class="clb">
+        PA CHANNELS <span class="v">${(A.rooms ?? []).length + (A.all ? 1 : 0)} ONLINE</span><br>
+        TTS ENGINE ${engine ? `<span class="v">${engine}</span>` : '<span class="w">NONE</span>'}<br>
+        MIC <span class="v">${LCARS.settings.get('micMute', false) ? 'MUTED' : 'LIVE'}</span>
+        <div style="margin-top:.6em">
+          VOICE <span class="v">MAJEL</span> ·
+          <span class="w">STANDBY</span><br>
+          <span style="opacity:.65">LOCAL SYNTHESIS BLOCKED ·<br>AWAITING GPU PASSTHROUGH ON FRED<br>
+          (XTTS / PIPER · TTS VOICE LAB)</span>
+        </div></div>`;
+      /* TTS readout through a chosen speaker — cloud engine, works now */
+      vox.style.overflowY = 'auto';       // .clb fills the box; button sat below it
+      if (A.ttsEngine && (A.ttsTargets ?? []).length) {
+        const t = document.createElement('div'); t.className = 'btncol';
+        t.style.marginBottom = scr.U(0.5) + 'px';
+        t.innerHTML = `<div class="wbtn" style="background:var(--c-gold)">COMPUTER VOICE · SPEAK</div>`;
+        /* PREPEND: .clb stretches to fill the panel, so anything appended after
+           it lands below the fold. Action on top, status beneath — matches the
+           PA column's layout. */
+        vox.insertBefore(t, vox.firstChild);
+        scr.onTap(t.querySelector('.wbtn'), () => {
+          HA.call('tts', 'speak', { entity_id: A.ttsEngine,
+            media_player_entity_id: A.ttsTargets[0][1], message: msg });
+          flashLine(vox, 'SPEAKING · ' + A.ttsTargets[0][0]);
+        });
+      }
       break; }
     case 'media:VOLUME': {
       /* LIVE + DRAGGABLE as of 2026-07-31. Three device families, one slider
@@ -1094,14 +1208,57 @@ function renderWorkspace(scr, g, view, x0, y0, x1, y1) {
       }));
       break; }
     case 'home:CALENDAR': {
-      const [today, next] = cols([['peri','TODAY'], ['lilac','UPCOMING']]);
-      today.innerHTML = `<div class="clb">14:00 <span class="v">STANDUP</span><br>18:30 <span class="v">FILM SESSION</span></div>`;
-      next.innerHTML = `<div class="clb">SAT 10:00 <span class="v">3D PRINT · BRACKET BATCH</span><br>
-        SUN 13:00 <span class="v">HOME LAB · OPNSENSE PREP</span><br>MON 09:00 <span class="v">STANDUP</span></div>`;
+      /* ---- REBUILT HONEST 2026-08-01 ----
+         This panel used to display entirely INVENTED events ("14:00 STANDUP",
+         "18:30 FILM SESSION") that looked completely live. That is the worst
+         failure mode for a wall panel — a convincing lie. HA has ZERO calendar.*
+         entities, so the schedule column now says so and names the fix, while
+         the columns beside it show things that are genuinely real. */
+      const [sched, list, day] = cols([['peri','SCHEDULE'], ['lilac','SHOPPING LIST'], ['gold','DAY CYCLE']]);
+
+      sched.innerHTML = `<div class="clb" style="display:flex;flex-direction:column;
+          align-items:center;justify-content:center;height:100%;text-align:center">
+        <div class="standby">■ STANDBY</div>
+        <div style="opacity:.6;margin-top:.6em">NO CALENDAR ENTITY IN HA<br>
+        <span style="opacity:.8">ADD THE GOOGLE CALENDAR INTEGRATION<br>
+        (SETTINGS → DEVICES & SERVICES)</span></div></div>`;
+      scr.breathe(sched.querySelector('.standby'), { soft:true });
+
+      /* LIVE shopping list — todo.get_items is response-only (see ha.js) */
+      const T = DATA.todo;
+      list.innerHTML = T
+        ? `<div class="clb">${T.open.length
+            ? T.open.slice(0, 12).map(i => `▸ <span class="v">${i.toUpperCase()}</span>`).join('<br>')
+            : '<span style="opacity:.6">LIST EMPTY</span>'}
+           <div style="margin-top:.6em;opacity:.6">${T.open.length} OPEN · ${T.done} DONE</div></div>`
+        : `<div class="clb"><span class="w">NO TODO LIST ENTITY</span></div>`;
+      list.style.overflowY = 'auto';
+
+      /* real solar clock + presence, both straight off HA */
+      const P = DATA.presence;
+      day.innerHTML = `<div class="clb">
+        SUNRISE <span class="v">${DATA.climate.sunrise}</span><br>
+        SUNSET <span class="v">${DATA.climate.sunset}</span><br>
+        PHASE <span class="v">${(HA.st('sun.sun')?.state ?? '—').replace('_',' ').toUpperCase()}</span><br>
+        LUNA <span class="v">${moonPhase().illum}%</span>
+        <div style="margin-top:.6em">PRESENCE ${P
+          ? (P.known ? `<span class="v">${P.state.replace('NOT_HOME','AWAY')}</span>`
+                     : `<span class="w">UNKNOWN</span><br><span style="opacity:.6">NO DEVICE TRACKER FEEDS person.patrick_byrne</span>`)
+          : '<span class="w">NO PERSON ENTITY</span>'}</div></div>`;
       break; }
     case 'home:ROUTINES': {
       const [rt, cats] = cols([['peri','ALEXA ROUTINES'], ['lilac','FELINE SYSTEMS']]);
-      btns(scr, rt, [['peri','GOOD NIGHT'], ['peri','I’M HOME'], ['peri','KICK OFF MY DAY'], ['peri','SLEEPY TIME']]);
+      /* WAS FOUR DEAD LABELS. HA exposes every Alexa routine as a button entity
+         (26 of them); lighting ones live in SCENES, the rest are here. Scrolls
+         because the list is long and will keep growing. */
+      const GR = (DATA.routines?.general ?? []);
+      if (GR.length) {
+        btns(scr, rt, GR.map(r => ['peri', r.label,
+          () => { HA.call('button', 'press', { entity_id: r.id }); flashLine(rt, r.label + ' RUNNING'); }]));
+        rt.style.overflowY = 'auto';
+      } else {
+        rt.innerHTML = `<div class="clb"><span class="w">NO ALEXA ROUTINES EXPOSED</span></div>`;
+      }
       /* feline systems: live litter-robot + cat sensors (mock values as fallbacks).
          Round numeric states — sensors report floats like 72.6027397260274 */
       const cat = (id, d) => { const v = HA.st(id)?.state ?? d;

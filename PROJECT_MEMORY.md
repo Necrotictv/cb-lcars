@@ -247,6 +247,52 @@ adding real devices (TP-Link/Tuya) + the floor plan himself later tonight.
 - To remove: delete `automation.lcars_red_alert_on_siren` (Settings → Automations) and the alert-row from the
   DIRECT CONTROL section.
 
+### 2026-08-03 — PLACEHOLDER SWEEP: 4 dead panels made real (app.js?v=24, ha.js?v=23)
+Patrick: "sweep everything but TTS is not complete due to the gpu gate on fred."
+Deployed under `fredlock` (LCARS-LaForge). **The recurring theme: most panels were
+not blocked at all — nobody had re-checked HA since they were written.**
+
+- **MEDIA·ANNOUNCE — the ship's PA is REAL.** Was 3 dead buttons + "AWAITING VOICE
+  LAB". HA has had `notify.everywhere_announce` (Alexa broadcast chime) plus
+  `_announce`/`_speak` per Echo, and `tts.google_translate_en_com`, the whole time.
+  Now: ALL DECKS broadcast + 4 per-room targets + a free-text LCARS message input
+  + COMPUTER VOICE·SPEAK via cloud TTS. Targets are ENUMERATED from notify.* so new
+  Echos appear by themselves.
+  **GPU GATE RESPECTED:** the local Majel voice (XTTS/Piper) needs Fred's GPU
+  passthrough, so VOICE SYSTEMS carries an explicit MAJEL·STANDBY row naming that
+  dependency. Cloud path ships; local path stays honestly blocked.
+- **ENVIRONMENTAL·SCENES — unblocked via a side door.** Was "SCENES BUILD IN PHASE 2".
+  HA still owns ONE light so native `scene.*` is impossible — but **Alexa already
+  holds the lighting scenes and exposes each as a `button.*` entity**. Firing those
+  is real control today: 12 lighting routines (SUNSET LIGHTS, LIVING ROOM AND FOYER
+  OFF, TREE LIGHTS, RED LIGHT, XMAS...). Swap to native scenes when MOES/Tuya lands.
+- **HOME·ROUTINES — 26 Alexa routines existed; the panel fired NONE.** It showed four
+  hardcoded labels wired to nothing. Now live-enumerated and split: 12 lighting →
+  SCENES, 14 general → ROUTINES, all firing `button.press`. Scrolls; grows by itself.
+- **HOME·CALENDAR — was displaying INVENTED events** ("14:00 STANDUP", "18:30 FILM
+  SESSION") that looked completely live. **Worst failure mode for a wall panel: a
+  convincing lie.** HA has ZERO `calendar.*`. Rebuilt as SCHEDULE (honest STANDBY
+  naming the fix: add the Google Calendar integration) + SHOPPING LIST (live via
+  `todo.get_items`, a response-service like the forecast) + DAY CYCLE (real
+  sunrise/sunset/sun phase/moon + presence, which reports UNKNOWN honestly because
+  no device_tracker feeds `person.patrick_byrne`).
+- **Main SECURITY cluster** said "MOTION ARMED · SIRENS STANDBY" hardcoded. Now derived
+  from `switch.*_motion_detection` (3/3 → ARMED / PARTIAL n/m / DISARMED) and `siren.*`.
+- **ENVIRONMENTAL·SHUTTERS** still hard-blocked (0 `cover.*`) but now names the actual
+  dependency instead of a bare STANDBY.
+- **New helper `flashLine(panel, text)`** — fire-and-forget service calls (announce,
+  TTS, scene) change no visible state; without feedback the panel looks broken and
+  gets tapped again, sending the announcement twice. Self-removing, replaces prior.
+- **LAYOUT GOTCHA (cost two redeploys):** `btns()` sets `innerHTML`, so anything added
+  must come AFTER it — and `.clb` stretches to fill the panel, so `appendChild` lands
+  below the 320px content box and is silently clipped. **Use `insertBefore(el,
+  panel.firstChild)` and set `overflowY:auto`.** Both the message input and the TTS
+  button hit this; they reported `visible:true` with real geometry while being
+  invisible on screen. Screenshots caught what the DOM check did not.
+- Still genuinely blocked: dimmers + SHUTTERS (need MOES/Tuya), holodeck hooks
+  (0 `script.*`), ntopng (PHASE 2), WebRTC cameras (queued, hardest item).
+- Noted: `media_player.vlc_telnet` is live — the old VLC-on-Fred task is already done.
+
 ### 2026-07-31 — 🚀 DEPLOYED TO FRED · https://lcc.necrotic.us · MEDIA + CLIMATE wired
 **LaForge is live on the network.** Serving stack, TLS, internal DNS, and the last
 pre-deploy UI items all landed. Previous HEAD `e9b44f4`; this work is uncommitted at

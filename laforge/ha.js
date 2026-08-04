@@ -62,6 +62,28 @@ const HA = (() => {
     sync(true);                                   // one full render with real data
     fetchForecast();                              // forecasts are a SERVICE now, not attributes
     setInterval(fetchForecast, 30 * 60000);       // refresh every 30 min
+    fetchTodo();                                  // shopping list is also response-only
+    setInterval(fetchTodo, 5 * 60000);
+  }
+
+  /* ---- shopping list: todo.get_items is a response service, same pattern as
+     the forecast — the items are NOT exposed as attributes, only the count. */
+  async function fetchTodo() {
+    if (!connected) return;
+    const ent = Object.keys(states).find(k => k.startsWith('todo.'));
+    if (!ent) return;
+    try {
+      const r = await send({ type:'call_service', domain:'todo', service:'get_items',
+        target:{ entity_id: ent }, return_response:true });
+      const items = r?.response?.[ent]?.items ?? [];
+      hooks.data.todo = {
+        entity: ent,
+        name: (st(ent)?.attributes?.friendly_name ?? 'LIST').toUpperCase(),
+        open: items.filter(i => i.status !== 'completed').map(i => i.summary),
+        done: items.filter(i => i.status === 'completed').length,
+      };
+      hooks.onUpdate?.(false);
+    } catch (e) { console.warn('[HA] todo fetch failed', e); }
   }
 
   /* ---- daily forecast: modern HA requires weather.get_forecasts with
@@ -219,6 +241,74 @@ const HA = (() => {
       min:     hv.attributes.min_temp ?? 45,
       max:     hv.attributes.max_temp ?? 95,
     } : null;
+
+    /* ---- SECURITY posture (was hardcoded "MOTION ARMED · SIRENS STANDBY") ----
+       The main-screen cluster claimed a state it never checked. Now derived. */
+    const motionSw = Object.keys(states).filter(k => /^switch\..*_motion_detection$/.test(k));
+    const sirenIds = Object.keys(states).filter(k => k.startsWith('siren.'));
+    D.security = {
+      motionOn:  motionSw.filter(k => st(k)?.state === 'on').length,
+      motionAll: motionSw.length,
+      sirenOn:   sirenIds.some(k => st(k)?.state === 'on'),
+      sirens:    sirenIds.map(k => [ (st(k).attributes.friendly_name ?? k).toUpperCase(), k, st(k).state === 'on' ]),
+      motion:    motionSw.map(k => [ (st(k).attributes.friendly_name ?? k).replace(/ Motion Detection$/i,'').toUpperCase(),
+                                     k, st(k).state === 'on' ]),
+    };
+
+    /* ---- ANNOUNCE targets ----
+       Alexa exposes TWO notify entities per device: *_announce (the broadcast
+       chime + "message") and *_speak (plain TTS out of that one device). We
+       enumerate rather than hardcode so new Echos appear by themselves.
+       `everywhere` is Alexa's own all-device group — the ship-wide PA. */
+    const notifyIds = Object.keys(states).filter(k => k.startsWith('notify.'));
+    const pretty = k => (st(k)?.attributes?.friendly_name ?? k.split('.')[1])
+      .replace(/ (Announce|Speak)$/i, '').toUpperCase();
+    D.announce = {
+      all:    notifyIds.find(k => /everywhere_announce$/.test(k)) ?? null,
+      rooms:  notifyIds.filter(k => /_announce$/.test(k) && !/everywhere/.test(k))
+                       .map(k => [pretty(k), k]),
+      speak:  notifyIds.filter(k => /_speak$/.test(k)).map(k => [pretty(k), k]),
+      /* Cloud TTS engine — works TODAY. The local Majel voice (XTTS/Piper) is
+         gated on Fred's GPU passthrough, so it is reported separately and
+         honestly rather than being folded in here. */
+      ttsEngine: Object.keys(states).find(k => k.startsWith('tts.')) ?? null,
+      ttsTargets: D.media.filter(m => m.live && m.id.startsWith('media_player.')).map(m => [m.label, m.id]),
+    };
+
+    /* ---- ALEXA ROUTINES (26 of them, and the UI was firing NONE) ----
+       Every Alexa routine is exposed as a `button.<account>_<routine name>`.
+       The ROUTINES panel had four hardcoded labels wired to nothing, and SCENES
+       was marked "PHASE 2".
+
+       KEY INSIGHT: several routines are LIGHT scenes (sunset lights, living
+       room + foyer off, tree lights, red light...). HA itself still only owns
+       `light.backyard_light`, so native scenes are impossible — but firing the
+       Alexa routine achieves the same thing TODAY. That is what unblocks the
+       SCENES panel without waiting on the Tuya/MOES switches.
+
+       Split by name so lighting lands in SCENES and the rest in ROUTINES.
+       Enumerated, never hardcoded — new routines appear on their own. */
+    const LIGHTY = /light|lamp|xmas|tree|sunset|celebration|falcor/i;
+    const routineBtns = Object.keys(states)
+      .filter(k => k.startsWith('button.') && /_gmail_com_/.test(k))
+      .map(k => {
+        let n = (st(k)?.attributes?.friendly_name ?? k)
+          .replace(/^.*gmail\.com\s*/i, '')      // strip the account prefix
+          .replace(/^Alexa,\s*/i, '')
+          .trim();
+        return { id: k, label: n.toUpperCase(), light: LIGHTY.test(n) };
+      })
+      .sort((a, b) => a.label.localeCompare(b.label));
+    D.routines = {
+      lights:  routineBtns.filter(r => r.light),
+      general: routineBtns.filter(r => !r.light),
+    };
+
+    /* presence — reported honestly; the person entity is often 'unknown'
+       because no device_tracker feeds it yet. */
+    const pp = st('person.patrick_byrne');
+    D.presence = pp ? { name:'PATRICK', state:(pp.state ?? 'unknown').toUpperCase(),
+                        known: pp.state === 'home' || pp.state === 'not_home' } : null;
 
     /* ---- WAN status (Arris gateway) ----
        ⚠️ Both speed sensors have reported 0.0 KiB/s since at least 7/14. Rather
